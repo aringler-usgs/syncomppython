@@ -20,9 +20,7 @@ os.system('wget -N http://www.ldeo.columbia.edu/~gcmt/projects/CMT/catalog/NEW_Q
 os.chdir(currdir)
 
 #Read in the CMT file
-
 qcmt = open(codepath + '/croncode/qcmt.ndk','r')
-
 while True:
 	line1 = qcmt.readline()
 	line2 = qcmt.readline()
@@ -97,12 +95,5 @@ while True:
 		CMTSol.write('Mtp:' + str(format(Mtp*10**int(CMTexp),'1.6e')).rjust(19,' ') + '\n')
 		CMTSol.write('\n')
 		CMTSol.close()
-
-
-
 qcmt.close()
 sys.exit(0)
-
-
-
-

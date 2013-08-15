@@ -14,10 +14,11 @@ from obspy.core.util.geodetics import gps2DistAzimuth
 import math
 
 debug=True
-stationlist = os.getcwd() + '/stationlist'
 datalessloc = '/APPS/metadata/SEED/'
-curnet = 'IU'
-stations = tuple(open(stationlist,'r'))
+userminfre = .005
+usermaxfre = .01
+lents = 8000
+
 
 
 
@@ -139,8 +140,8 @@ def getstalist(sp,etime,curnet):
 
 
 
-if not len(sys.argv) == 3:
-	print "Usage: Syntheticlocation ResultsName"
+if not len(sys.argv) == 4:
+	print "Usage: Syntheticlocation ResultsName Network"
 	exit(0)
  
 synfile = sys.argv[1]
@@ -158,6 +159,8 @@ cmt = tuple(open(synfile + '/CMTSOLUTION'))
 resultdir = sys.argv[2]
 if not os.path.exists(os.getcwd() + '/' + resultdir):
 	os.mkdir(os.getcwd() + '/' + resultdir)
+
+curnet = sys.argv[3]
 
 #Lets read in the dataless
 sp = Parser(datalessloc + curnet + ".dataless")
@@ -189,6 +192,7 @@ if debug:
 
 stations = getstalist(sp,eventtime,curnet)
 
+
 #Lets start by using a station list and then move to a different approach
 for sta in stations:
 	cursta = sta.strip()
@@ -204,10 +208,10 @@ for sta in stations:
 	try:
 		st = read('/' + dataloc + '/seed/' + net + '_' + cursta + '/' + str(eventtime.year) + \
 		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '_' + net + '_' + cursta + '/*LH*.seed', \
-		starttime=eventtime,endtime=(eventtime+8000))
+		starttime=eventtime,endtime=(eventtime+lents))
 		st += read('/' + dataloc + '/seed/' + net + '_' + cursta + '/' + str(eventtime.year) + \
 		'/' + str(eventtime.year) + '_' + str(eventtime.julday + 1).zfill(3) + '_' + net + '_' + cursta + '/*LH*.seed', \
-		starttime=eventtime,endtime=(eventtime+8000))
+		starttime=eventtime,endtime=(eventtime+lents))
 	except:
 		print('No data for ' + net + ' ' + cursta)
 		continue
@@ -221,7 +225,7 @@ for sta in stations:
 		trace.taper(type='cosine')				
 		trace.simulate(paz_remove=paz)
 #Here we filter
-		trace.filter("bandpass",freqmin = 0.0025,freqmax= 0.005, corners=4)
+		trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=4)
 		trace.taper(type='cosine')
 		
 #Now we rotate the horizontals to E and W
@@ -264,7 +268,7 @@ for sta in stations:
 		curtrace[0].data = curtrace[0].data/(10**9)
 		curtrace.taper(type='cosine')
 		curtrace.simulate(paz_remove=paz, paz_simulate=paz)
-		curtrace.filter("bandpass",freqmin = 0.0025,freqmax= 0.005, corners=4)
+		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=4)
 		curtrace[0].stats.channel=(curtrace[0].stats.channel).replace('LH','LX')
 		synstream += curtrace
 			
@@ -281,7 +285,7 @@ for sta in stations:
 		print(vertcomps)
 		
 #Set the time series
-	t=numpy.arange(0,vertcomps[0].stats.npts / vertcomps[0].stats.sampling_rate, vertcomps[0].stats.delta)
+	tz=numpy.arange(0,vertcomps[0].stats.npts / vertcomps[0].stats.sampling_rate, vertcomps[0].stats.delta)
 #Get a legend and plot the vertical
 	synplot = matplotlib.pyplot.figure(1)
 	matplotlib.pyplot.subplot(311)
@@ -301,7 +305,7 @@ for sta in stations:
 	titlelegend = titlelegend + 'Distance:' + str(dist) + ' degrees'
 	matplotlib.pyplot.title(titlelegend)
 	for comps in vertcomps:
-		matplotlib.pyplot.plot(t,comps.data, label=comps.stats.location + ' ' + comps.stats.channel)
+		matplotlib.pyplot.plot(tz,comps.data, label=comps.stats.location + ' ' + comps.stats.channel)
 	matplotlib.pyplot.legend()
 
 
@@ -311,13 +315,14 @@ for sta in stations:
 	if debug:
 		print(finalstream)
 	matplotlib.pyplot.subplot(312)
+	tne=numpy.arange(0,finalstream[0].stats.npts / finalstream[0].stats.sampling_rate, finalstream[0].stats.delta)
 	for comps in finalstream.select(component="N"):
-		matplotlib.pyplot.plot(t,comps.data, label=comps.stats.location + ' ' + comps.stats.channel)
+		matplotlib.pyplot.plot(tne,comps.data, label=comps.stats.location + ' ' + comps.stats.channel)
 	matplotlib.pyplot.legend()
 	matplotlib.pyplot.ylabel('Velocity (m/s)')	
 	matplotlib.pyplot.subplot(313)
 	for comps in finalstream.select(component="E"):
-		matplotlib.pyplot.plot(t,comps.data, label=comps.stats.location + ' ' + comps.stats.channel)
+		matplotlib.pyplot.plot(tne,comps.data, label=comps.stats.location + ' ' + comps.stats.channel)
 	matplotlib.pyplot.legend()
 	matplotlib.pyplot.xlabel('Time (s)')
 

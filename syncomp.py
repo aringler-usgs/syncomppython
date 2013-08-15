@@ -1,0 +1,330 @@
+#!/usr/bin/env python
+
+import sys
+import os
+import glob
+import numpy
+import matplotlib.pyplot
+from obspy import read
+from obspy import Stream
+from obspy.core import UTCDateTime
+from obspy.xseed import Parser
+from time import gmtime, strftime
+from obspy.core.util.geodetics import gps2DistAzimuth
+import math
+
+debug=True
+stationlist = os.getcwd() + '/stationlist'
+datalessloc = '/APPS/metadata/SEED/'
+curnet = 'IU'
+stations = tuple(open(stationlist,'r'))
+
+
+
+
+
+
+
+def getorientation(net,sta,loc,chan,evetime,xseedval):
+	for cursta in xseedval.stations:
+#As we scan through blockettes we need to find blockettes 50 and 52
+		for blkt in cursta:
+			if blkt.id == 50:
+#Pull the station info for blockette 50
+				stacall = blkt.station_call_letters.strip()
+			if stacall == sta:
+				if blkt.id == 52 and blkt.location_identifier == loc and blkt.channel_identifier == chan:
+					if type(blkt.end_date) is str:
+						curdoy = strftime("%j",gmtime())
+						curyear = strftime("%Y",gmtime())
+						curtime = UTCDateTime(curyear + "-" + curdoy + "T00:00:00.0") 
+						if blkt.start_date <= evetime:
+							azimuth = blkt.azimuth
+					elif blkt.start_date <= evetime and blkt.end_date >= evetime:
+						azimuth = blkt.azimuth
+	return azimuth
+
+
+def rotatehorizontal(stream, angle):
+#Function to rotate
+        theta_r = math.radians(angle)
+# create new trace objects with same info as previous
+        rotatedN = stream[0].copy()
+        rotatedE = stream[1].copy()
+# assign rotated data
+        rotatedN.data = stream[0].data*math.cos(theta_r) + stream[1].data*math.sin(theta_r)
+        rotatedE.data = stream[1].data*math.cos(theta_r) - stream[0].data*math.sin(theta_r)
+	rotatedN.stats.channel='LHN'
+	rotatedE.stats.channel='LHE'
+# return new streams object with rotated traces
+        streamsR = Stream(traces = [rotatedN, rotatedE])
+        return streamsR
+
+def choptocommon(stream):
+	stimes = []
+	etimes = []
+
+	for trace in stream:
+		stimes.append(trace.stats.starttime)
+		etimes.append(trace.stats.endtime)
+	newstime = stimes[0]
+	newetime = etimes[0]
+
+	for curstime in stimes:
+		if debug:
+			print(curstime)
+		if curstime >= newstime:
+			newstime = curstime
+	
+	for curetime in etimes:
+		if debug:		
+			print(curetime)
+		if curetime <= newetime:
+			newetime = curetime
+
+	if debug:
+		print(newstime)
+		print(newetime)
+		print(stream)
+	for trace in stream:	
+		trace.trim(starttime=newstime,endtime=newetime)
+	if debug:
+		print(stream)
+	return stream
+
+
+def getlatlon(sta,etime,xseedval):
+	for cursta in xseedval.stations:
+#As we scan through blockettes we need to find blockettes 50 and 52
+		for blkt in cursta:
+			if blkt.id == 50:
+#Pull the station info for blockette 50
+				stacall = blkt.station_call_letters.strip()
+				if stacall == sta:
+					lat = blkt.latitude
+					lon = blkt.longitude	
+					if type(blkt.end_effective_date) is str:
+						curdoy = strftime("%j",gmtime())
+						curyear = strftime("%Y",gmtime())
+						curtime = UTCDateTime(curyear + "-" + curdoy + "T00:00:00.0") 
+						if blkt.start_effective_date <= etime:
+							lat = blkt.latitude
+							lon = blkt.longitude
+						elif blkt.start_effective_date <= etime and blkt.end_effective_date >= etime:
+							lat = blkt.latitude
+							lon = blkt.longitude	
+
+
+	return lat,lon
+
+def getstalist(sp,etime,curnet):
+	stations = []
+	for cursta in sp.stations:
+#As we scan through blockettes we need to find blockettes 50 
+		for blkt in cursta:
+			if blkt.id == 50:
+#Pull the station info for blockette 50
+				stacall = blkt.station_call_letters.strip()
+				if type(blkt.end_effective_date) is str:
+					curdoy = strftime("%j",gmtime())
+					curyear = strftime("%Y",gmtime())
+					curtime = UTCDateTime(curyear + "-" + curdoy + "T00:00:00.0") 
+					if blkt.start_effective_date <= etime:
+						stations.append(curnet + ' ' + blkt.station_call_letters.strip())
+					elif blkt.start_effective_date <= etime and blkt.end_effective_date >= etime:
+						stations.append(curnet + ' ' + \
+						blkt.station_call_letters.strip())	
+	return stations
+
+
+
+
+if not len(sys.argv) == 3:
+	print "Usage: Syntheticlocation ResultsName"
+	exit(0)
+ 
+synfile = sys.argv[1]
+#Check if we are dealing with Princeton synthetics
+#Read in the CMT solution 
+
+if debug:
+	print "We are using local synthetics"
+if not os.path.isfile(synfile + '/CMTSOLUTION'):
+	print "No CMT found"
+	exit(0)
+cmt = tuple(open(synfile + '/CMTSOLUTION'))
+
+#Lets make a local results directory
+resultdir = sys.argv[2]
+if not os.path.exists(os.getcwd() + '/' + resultdir):
+	os.mkdir(os.getcwd() + '/' + resultdir)
+
+#Lets read in the dataless
+sp = Parser(datalessloc + curnet + ".dataless")
+
+
+
+
+
+
+
+
+#Now we can continue like there is no difference between Princeton and our Synthetics
+#Lets get the event time from the cmt
+cmtline1 = ' '.join(cmt[0].split())
+cmtlat = cmt[4].replace('latitude:','').strip()
+cmtlon = cmt[5].replace('longitude:','').strip()
+
+if debug:
+	print cmtline1
+cmtline1 = cmtline1.split()
+if debug:
+	print cmtline1[1] + ' ' + cmtline1[2] + ' ' + cmtline1[3] + ' ' + cmtline1[4] + ' ' + cmtline1[5] + ' ' + cmtline1[6]
+eventtime = UTCDateTime(int(cmtline1[1]),int(cmtline1[2]),int(cmtline1[3]),int(cmtline1[4]),int(cmtline1[5]),float(cmtline1[6]))
+if debug:
+	print 'Year:' + str(eventtime.year)
+	print 'Day:' + str(eventtime.julday)
+	print 'Hour:' + str(eventtime.hour)
+	print 'Minute:' + str(eventtime.minute)
+
+stations = getstalist(sp,eventtime,curnet)
+
+#Lets start by using a station list and then move to a different approach
+for sta in stations:
+	cursta = sta.strip()
+	if debug:
+		print 'Current station:' + cursta
+	cursta = sta.split()
+	net = cursta[0]
+	cursta = cursta[1]
+	if net in set(['IW','NE','US']):	
+		dataloc = 'xs1'	
+	elif net in set(['IU','IC','CU']):
+		dataloc = 'xs0'	
+	try:
+		st = read('/' + dataloc + '/seed/' + net + '_' + cursta + '/' + str(eventtime.year) + \
+		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '_' + net + '_' + cursta + '/*LH*.seed', \
+		starttime=eventtime,endtime=(eventtime+8000))
+		st += read('/' + dataloc + '/seed/' + net + '_' + cursta + '/' + str(eventtime.year) + \
+		'/' + str(eventtime.year) + '_' + str(eventtime.julday + 1).zfill(3) + '_' + net + '_' + cursta + '/*LH*.seed', \
+		starttime=eventtime,endtime=(eventtime+8000))
+	except:
+		print('No data for ' + net + ' ' + cursta)
+		continue
+	st.merge()
+	if debug:
+		print 'We have data'
+#Lets go through each trace in the stream and deconvolve and filter
+	for trace in st:
+#Here we get the response and remove it
+		paz=sp.getPAZ(net + '.' + cursta + '.' + trace.stats.location + '.' + trace.stats.channel,datetime=eventtime)
+		trace.taper(type='cosine')				
+		trace.simulate(paz_remove=paz)
+#Here we filter
+		trace.filter("bandpass",freqmin = 0.0025,freqmax= 0.005, corners=4)
+		trace.taper(type='cosine')
+		
+#Now we rotate the horizontals to E and W
+	horizontalstream = st	
+	finalstream=Stream()
+	for trace in horizontalstream.select(component="Z"):
+		finalstream += trace
+		horizontalstream.remove(trace)
+
+	if debug:
+		print 'Here are the horizontal traces:'
+		print(horizontalstream)
+
+	locations=[]
+	for trace in horizontalstream:
+		locations.append(trace.stats.location)
+	locations=set(locations)
+
+	for curloc in locations:
+		curlochorizontal = horizontalstream.select(location=curloc)
+		if debug:
+			print "Here are the number of traces:" + str(len(horizontalstream)) + " which should be 2"
+			azi=getorientation(net,cursta,curloc,horizontalstream[0].stats.channel,eventtime,sp)
+			if debug:
+				print "Here is the azimuth" + str(azi)
+			horizontalstream = choptocommon(horizontalstream)
+			finalstream +=rotatehorizontal(horizontalstream,azi)	
+			
+	if debug:
+		print(finalstream)
+
+#We now have rotated data and filtered data so it is time to read in the synthetics and process them
+	syns = glob.glob(synfile + '/' + cursta + '.*.LX*.modes.sac*')
+	synstream = Stream()
+	for cursyn in syns:
+		if debug:
+			print(cursyn)
+		curtrace = read(cursyn)
+		curtrace.integrate()
+		curtrace[0].data = curtrace[0].data/(10**9)
+		curtrace.taper(type='cosine')
+		curtrace.simulate(paz_remove=paz, paz_simulate=paz)
+		curtrace.filter("bandpass",freqmin = 0.0025,freqmax= 0.005, corners=4)
+		curtrace[0].stats.channel=(curtrace[0].stats.channel).replace('LH','LX')
+		synstream += curtrace
+			
+	if debug:
+		print(synstream)
+
+#We now need to plot everything and save it
+#Lets plot the verticals first
+	vertcomps = finalstream.select(component="Z")
+	vertcomps += synstream.select(component="Z")
+	vertcomps = choptocommon(vertcomps)
+	if debug:
+		print 'Here are the chopped components'
+		print(vertcomps)
+		
+#Set the time series
+	t=numpy.arange(0,vertcomps[0].stats.npts / vertcomps[0].stats.sampling_rate, vertcomps[0].stats.delta)
+#Get a legend and plot the vertical
+	synplot = matplotlib.pyplot.figure(1)
+	matplotlib.pyplot.subplot(311)
+	titlelegend = vertcomps[0].stats.network + ' ' + vertcomps[0].stats.station + ' '
+	stime = str(vertcomps[0].stats.starttime.year) + ' ' + str(vertcomps[0].stats.starttime.julday) + ' ' + \
+	str(vertcomps[0].stats.starttime.hour) + ':' + str(vertcomps[0].stats.starttime.minute) + \
+	':' + str("{0:.2f}".format(vertcomps[0].stats.starttime.second))
+	titlelegend = titlelegend + stime + ' ' 
+	lat,lon = getlatlon(cursta,eventtime,sp)
+	if debug:
+		print "Latitude:" + str(lat)
+		print "Longitude:" + str(lon)	
+		print "CMT Latitude:" + str(cmtlat)
+		print "CMT Longitude:" + str(cmtlon)
+	dist= gps2DistAzimuth(float(cmtlat),float(cmtlon),lat,lon)
+	dist ="{0:.2f}".format( 0.0089932 * dist[0] / 1000)
+	titlelegend = titlelegend + 'Distance:' + str(dist) + ' degrees'
+	matplotlib.pyplot.title(titlelegend)
+	for comps in vertcomps:
+		matplotlib.pyplot.plot(t,comps.data, label=comps.stats.location + ' ' + comps.stats.channel)
+	matplotlib.pyplot.legend()
+
+
+	finalstream += synstream.select(component="N")
+	finalstream += synstream.select(component="E")
+	finalstream = choptocommon(finalstream)
+	if debug:
+		print(finalstream)
+	matplotlib.pyplot.subplot(312)
+	for comps in finalstream.select(component="N"):
+		matplotlib.pyplot.plot(t,comps.data, label=comps.stats.location + ' ' + comps.stats.channel)
+	matplotlib.pyplot.legend()
+	matplotlib.pyplot.ylabel('Velocity (m/s)')	
+	matplotlib.pyplot.subplot(313)
+	for comps in finalstream.select(component="E"):
+		matplotlib.pyplot.plot(t,comps.data, label=comps.stats.location + ' ' + comps.stats.channel)
+	matplotlib.pyplot.legend()
+	matplotlib.pyplot.xlabel('Time (s)')
+
+	matplotlib.pyplot.savefig(os.getcwd() + '/' + resultdir + '/' + cursta + \
+	str(vertcomps[0].stats.starttime.year) + str(vertcomps[0].stats.starttime.julday) + \
+	str(vertcomps[0].stats.starttime.hour) + str(vertcomps[0].stats.starttime.minute) + '.jpeg', format = 'jpeg', \
+	orientation = 'landscape')
+	synplot.clear()
+
+

@@ -20,13 +20,8 @@ usermaxfre = .01
 lents = 8000
 
 
-
-
-
-
-
-
 def getorientation(net,sta,loc,chan,evetime,xseedval):
+#A function to get the orientation of a station at a specific time
 	for cursta in xseedval.stations:
 #As we scan through blockettes we need to find blockettes 50 and 52
 		for blkt in cursta:
@@ -45,9 +40,8 @@ def getorientation(net,sta,loc,chan,evetime,xseedval):
 						azimuth = blkt.azimuth
 	return azimuth
 
-
 def rotatehorizontal(stream, angle):
-#Function to rotate
+#Function to rotate the data by a given angle
         theta_r = math.radians(angle)
 # create new trace objects with same info as previous
         rotatedN = stream[0].copy()
@@ -62,6 +56,7 @@ def rotatehorizontal(stream, angle):
         return streamsR
 
 def choptocommon(stream):
+#A function to chop the data to a common time window
 	stimes = []
 	etimes = []
 
@@ -93,8 +88,8 @@ def choptocommon(stream):
 		print(stream)
 	return stream
 
-
 def getlatlon(sta,etime,xseedval):
+#A function to get the lat and lon of a station at a given time
 	for cursta in xseedval.stations:
 #As we scan through blockettes we need to find blockettes 50 and 52
 		for blkt in cursta:
@@ -111,14 +106,15 @@ def getlatlon(sta,etime,xseedval):
 						if blkt.start_effective_date <= etime:
 							lat = blkt.latitude
 							lon = blkt.longitude
-						elif blkt.start_effective_date <= etime and blkt.end_effective_date >= etime:
-							lat = blkt.latitude
-							lon = blkt.longitude	
+					elif blkt.start_effective_date <= etime and blkt.end_effective_date >= etime:
+						lat = blkt.latitude
+						lon = blkt.longitude	
 
 
 	return lat,lon
 
 def getstalist(sp,etime,curnet):
+#A function to get a station list
 	stations = []
 	for cursta in sp.stations:
 #As we scan through blockettes we need to find blockettes 50 
@@ -126,28 +122,28 @@ def getstalist(sp,etime,curnet):
 			if blkt.id == 50:
 #Pull the station info for blockette 50
 				stacall = blkt.station_call_letters.strip()
+				if debug:
+					print "Here is a station in the dataless" + stacall
 				if type(blkt.end_effective_date) is str:
 					curdoy = strftime("%j",gmtime())
 					curyear = strftime("%Y",gmtime())
 					curtime = UTCDateTime(curyear + "-" + curdoy + "T00:00:00.0") 
+					
 					if blkt.start_effective_date <= etime:
 						stations.append(curnet + ' ' + blkt.station_call_letters.strip())
-					elif blkt.start_effective_date <= etime and blkt.end_effective_date >= etime:
-						stations.append(curnet + ' ' + \
-						blkt.station_call_letters.strip())	
+				elif blkt.start_effective_date <= etime and blkt.end_effective_date >= etime:
+					stations.append(curnet + ' ' + \
+					blkt.station_call_letters.strip())	
 	return stations
 
-
-
-
+#Start of the main part of the program
 if not len(sys.argv) == 4:
 	print "Usage: Syntheticlocation ResultsName Network"
 	exit(0)
  
 synfile = sys.argv[1]
-#Check if we are dealing with Princeton synthetics
-#Read in the CMT solution 
 
+#Read in the CMT solution 
 if debug:
 	print "We are using local synthetics"
 if not os.path.isfile(synfile + '/CMTSOLUTION'):
@@ -163,8 +159,11 @@ if not os.path.exists(os.getcwd() + '/' + resultdir):
 curnet = sys.argv[3]
 
 #Lets read in the dataless
-sp = Parser(datalessloc + curnet + ".dataless")
-
+try:
+	sp = Parser(datalessloc + curnet + ".dataless")
+except:
+	print "Can not read the dataless."
+	exit(0)
 
 
 
@@ -191,6 +190,10 @@ if debug:
 	print 'Minute:' + str(eventtime.minute)
 
 stations = getstalist(sp,eventtime,curnet)
+if debug:
+	print "Here are the stations we found"	
+	for sta in stations:
+		print "Here is a station:" + sta
 
 
 #Lets start by using a station list and then move to a different approach
@@ -215,19 +218,22 @@ for sta in stations:
 	except:
 		print('No data for ' + net + ' ' + cursta)
 		continue
-	st.merge()
+	st.merge(fill_value='latest')
 	if debug:
 		print 'We have data'
 #Lets go through each trace in the stream and deconvolve and filter
 	for trace in st:
 #Here we get the response and remove it
-		paz=sp.getPAZ(net + '.' + cursta + '.' + trace.stats.location + '.' + trace.stats.channel,datetime=eventtime)
-		trace.taper(type='cosine')				
-		trace.simulate(paz_remove=paz)
+		try:
+			paz=sp.getPAZ(net + '.' + cursta + '.' + trace.stats.location + '.' + trace.stats.channel,datetime=eventtime)
+			trace.taper(type='cosine')				
+			trace.simulate(paz_remove=paz)
 #Here we filter
-		trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=4)
-		trace.taper(type='cosine')
-		
+			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=4)
+			trace.taper(type='cosine')
+		except:
+			print('Can not find the response')
+			st.remove(trace)
 #Now we rotate the horizontals to E and W
 	horizontalstream = st	
 	finalstream=Stream()
@@ -267,7 +273,8 @@ for sta in stations:
 		curtrace.integrate()
 		curtrace[0].data = curtrace[0].data/(10**9)
 		curtrace.taper(type='cosine')
-		curtrace.simulate(paz_remove=paz, paz_simulate=paz)
+		pazfake= {'poles': [1-1j], 'zeros': [1-1j], 'gain':1,'sensitivity': 1}
+		curtrace.simulate(paz_remove=pazfake, paz_simulate=pazfake)
 		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=4)
 		curtrace[0].stats.channel=(curtrace[0].stats.channel).replace('LH','LX')
 		synstream += curtrace
@@ -313,6 +320,7 @@ for sta in stations:
 	finalstream += synstream.select(component="E")
 	finalstream = choptocommon(finalstream)
 	if debug:
+		print "Here is the final stream:"
 		print(finalstream)
 	matplotlib.pyplot.subplot(312)
 	tne=numpy.arange(0,finalstream[0].stats.npts / finalstream[0].stats.sampling_rate, finalstream[0].stats.delta)

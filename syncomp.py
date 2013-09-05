@@ -142,6 +142,8 @@ if not len(sys.argv) == 4:
 	exit(0)
  
 synfile = sys.argv[1]
+if synfile[-1] == '/':
+	synfile = synfile[:-1]
 
 #Read in the CMT solution 
 if debug:

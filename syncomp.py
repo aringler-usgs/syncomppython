@@ -211,10 +211,13 @@ for sta in stations:
 	try:
 		st = read('/' + dataloc + '/seed/' + net + '_' + cursta + '/' + str(eventtime.year) + \
 		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '_' + net + '_' + cursta + '/*LH*.seed', \
-		starttime=eventtime,endtime=(eventtime+lents))
+		starttime=eventtime-2000,endtime=(eventtime+lents+2000))
 		st += read('/' + dataloc + '/seed/' + net + '_' + cursta + '/' + str(eventtime.year) + \
 		'/' + str(eventtime.year) + '_' + str(eventtime.julday + 1).zfill(3) + '_' + net + '_' + cursta + '/*LH*.seed', \
-		starttime=eventtime,endtime=(eventtime+lents))
+		starttime=eventtime-2000,endtime=(eventtime+lents+2000))
+		st += read('/' + dataloc + '/seed/' + net + '_' + cursta + '/' + str(eventtime.year) + \
+		'/' + str(eventtime.year) + '_' + str(eventtime.julday - 1).zfill(3) + '_' + net + '_' + cursta + '/*LH*.seed', \
+		starttime=eventtime-2000,endtime=(eventtime+lents+2000))
 	except:
 		print('No data for ' + net + ' ' + cursta)
 		continue
@@ -231,6 +234,7 @@ for sta in stations:
 #Here we filter
 			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=4)
 			trace.taper(type='cosine')
+			trace.trim(starttime=eventtime,endtime=(eventtime+lents))
 		except:
 			print('Can not find the response')
 			st.remove(trace)
@@ -253,12 +257,12 @@ for sta in stations:
 	for curloc in locations:
 		curlochorizontal = horizontalstream.select(location=curloc)
 		if debug:
-			print "Here are the number of traces:" + str(len(horizontalstream)) + " which should be 2"
-			azi=getorientation(net,cursta,curloc,horizontalstream[0].stats.channel,eventtime,sp)
+			print "Here are the number of traces:" + str(len(curlochorizontal)) + " which should be 2"
+			azi=getorientation(net,cursta,curloc,curlochorizontal[0].stats.channel,eventtime,sp)
 			if debug:
 				print "Here is the azimuth" + str(azi)
-			horizontalstream = choptocommon(horizontalstream)
-			finalstream +=rotatehorizontal(horizontalstream,azi)	
+			curlochorizontal = choptocommon(curlochorizontal)
+			finalstream += rotatehorizontal(curlochorizontal,azi)	
 			
 	if debug:
 		print(finalstream)
@@ -325,6 +329,9 @@ for sta in stations:
 	matplotlib.pyplot.subplot(312)
 	tne=numpy.arange(0,finalstream[0].stats.npts / finalstream[0].stats.sampling_rate, finalstream[0].stats.delta)
 	for comps in finalstream.select(component="N"):
+		if debug:
+			print 'Here is one of the components'
+			print comps.stats
 		matplotlib.pyplot.plot(tne,comps.data, label=comps.stats.location + ' ' + comps.stats.channel)
 	matplotlib.pyplot.legend()
 	matplotlib.pyplot.ylabel('Velocity (m/s)')	
@@ -338,6 +345,7 @@ for sta in stations:
 	str(vertcomps[0].stats.starttime.year) + str(vertcomps[0].stats.starttime.julday) + \
 	str(vertcomps[0].stats.starttime.hour) + str(vertcomps[0].stats.starttime.minute) + '.jpeg', format = 'jpeg', \
 	orientation = 'landscape')
+#	matplotlib.pyplot.show()
 	synplot.clear()
 
 

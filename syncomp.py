@@ -4,14 +4,15 @@ import sys
 import os
 import glob
 import numpy
-import matplotlib.pyplot
-from obspy import read
-from obspy import Stream
+import matplotlib
+import math
+from matplotlib.pyplot import (figure,axes,plot,xlabel,ylabel,title,subplot,legend,savefig,show)
+from obspy import read, Stream
 from obspy.core import UTCDateTime
 from obspy.xseed import Parser
 from time import gmtime, strftime
 from obspy.core.util.geodetics import gps2DistAzimuth
-import math
+
 
 debug=False
 datalessloc = '/APPS/metadata/SEED/'
@@ -157,6 +158,50 @@ def getstalist(sp,etime,curnet):
 					blkt.station_call_letters.strip())	
 	return stations
 
+def readcmt(cmt):
+#Now we can continue like there is no difference between Princeton and our Synthetics
+#Lets get the event time from the cmt
+	cmtline1 = ' '.join(cmt[0].split())
+	cmtlat = cmt[4].replace('latitude:','').strip()
+	cmtlon = cmt[5].replace('longitude:','').strip()
+	if debug:
+		print cmtline1
+	cmtline1 = cmtline1.split()
+	if debug:
+		print cmtline1[1] + ' ' + cmtline1[2] + ' ' + cmtline1[3] + ' ' + cmtline1[4] + ' ' + cmtline1[5] + ' ' + cmtline1[6]
+	eventtime = UTCDateTime(int(cmtline1[1]),int(cmtline1[2]),int(cmtline1[3]),int(cmtline1[4]),int(cmtline1[5]),float(cmtline1[6]))
+	if debug:
+		print 'Year:' + str(eventtime.year)
+		print 'Day:' + str(eventtime.julday)
+		print 'Hour:' + str(eventtime.hour)
+		print 'Minute:' + str(eventtime.minute)
+	return cmtlat, cmtlon, eventtime
+
+
+def getdata(net,sta,eventtime,lents):
+	if net in set(['IW','NE','US']):	
+		dataloc = 'xs1'	
+	elif net in set(['IU','IC','CU']):
+		dataloc = 'xs0'	
+	
+	st = read('/' + dataloc + '/seed/' + net + '_' + sta + '/' + str(eventtime.year) + \
+	'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '_' + net + '_' + sta + '/*LH*.seed', \
+	starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+	st += read('/' + dataloc + '/seed/' + net + '_' + sta + '/' + str(eventtime.year) + \
+	'/' + str(eventtime.year) + '_' + str(eventtime.julday + 1).zfill(3) + '_' + net + '_' + sta + '/*LH*.seed', \
+	starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+	st += read('/' + dataloc + '/seed/' + net + '_' + sta + '/' + str(eventtime.year) + \
+	'/' + str(eventtime.year) + '_' + str(eventtime.julday - 1).zfill(3) + '_' + net + '_' + sta + '/*LH*.seed', \
+	starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+	st.merge(fill_value='latest')
+	if debug:
+		print 'We have data'
+
+	return st
+
+
+
+
 #Start of the main part of the program
 if not len(sys.argv) == 4:
 	print "Usage: Syntheticlocation ResultsName Network"
@@ -173,6 +218,7 @@ if not os.path.isfile(synfile + '/CMTSOLUTION'):
 	print "No CMT found"
 	exit(0)
 cmt = tuple(open(synfile + '/CMTSOLUTION'))
+cmtlat, cmtlon, eventtime = readcmt(cmt)
 
 #Lets make a local results directory
 resultdir = sys.argv[2]
@@ -187,26 +233,6 @@ try:
 except:
 	print "Can not read the dataless."
 	exit(0)
-
-
-
-#Now we can continue like there is no difference between Princeton and our Synthetics
-#Lets get the event time from the cmt
-cmtline1 = ' '.join(cmt[0].split())
-cmtlat = cmt[4].replace('latitude:','').strip()
-cmtlon = cmt[5].replace('longitude:','').strip()
-
-if debug:
-	print cmtline1
-cmtline1 = cmtline1.split()
-if debug:
-	print cmtline1[1] + ' ' + cmtline1[2] + ' ' + cmtline1[3] + ' ' + cmtline1[4] + ' ' + cmtline1[5] + ' ' + cmtline1[6]
-eventtime = UTCDateTime(int(cmtline1[1]),int(cmtline1[2]),int(cmtline1[3]),int(cmtline1[4]),int(cmtline1[5]),float(cmtline1[6]))
-if debug:
-	print 'Year:' + str(eventtime.year)
-	print 'Day:' + str(eventtime.julday)
-	print 'Hour:' + str(eventtime.hour)
-	print 'Minute:' + str(eventtime.minute)
 
 stations = getstalist(sp,eventtime,curnet)
 if debug:
@@ -223,31 +249,18 @@ for sta in stations:
 	cursta = sta.split()
 	net = cursta[0]
 	cursta = cursta[1]
-	if net in set(['IW','NE','US']):	
-		dataloc = 'xs1'	
-	elif net in set(['IU','IC','CU']):
-		dataloc = 'xs0'	
 	try:
-		st = read('/' + dataloc + '/seed/' + net + '_' + cursta + '/' + str(eventtime.year) + \
-		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '_' + net + '_' + cursta + '/*LH*.seed', \
-		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
-		st += read('/' + dataloc + '/seed/' + net + '_' + cursta + '/' + str(eventtime.year) + \
-		'/' + str(eventtime.year) + '_' + str(eventtime.julday + 1).zfill(3) + '_' + net + '_' + cursta + '/*LH*.seed', \
-		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
-		st += read('/' + dataloc + '/seed/' + net + '_' + cursta + '/' + str(eventtime.year) + \
-		'/' + str(eventtime.year) + '_' + str(eventtime.julday - 1).zfill(3) + '_' + net + '_' + cursta + '/*LH*.seed', \
-		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+		st = getdata(net,cursta,eventtime,lents)
 	except:
 		print('No data for ' + net + ' ' + cursta)
 		continue
-	st.merge(fill_value='latest')
-	if debug:
-		print 'We have data'
+		
 #Lets go through each trace in the stream and deconvolve and filter
 	for trace in st:
 #Here we get the response and remove it
 		try:
 			paz=sp.getPAZ(net + '.' + cursta + '.' + trace.stats.location + '.' + trace.stats.channel,datetime=eventtime)
+			trace.integrate()
 			trace.taper(type='cosine')				
 			trace.simulate(paz_remove=paz)
 #Here we filter
@@ -299,6 +312,7 @@ for sta in stations:
 			print(cursyn)
 		curtrace = read(cursyn)
 		curtrace.integrate()
+		curtrace.integrate()
 		curtrace[0].data = curtrace[0].data/(10**9)
 		curtrace.taper(type='cosine')
 		pazfake= {'poles': [1-1j], 'zeros': [1-1j], 'gain':1,'sensitivity': 1}
@@ -322,8 +336,8 @@ for sta in stations:
 #Set the time series
 	tz=numpy.arange(0,vertcomps[0].stats.npts / vertcomps[0].stats.sampling_rate, vertcomps[0].stats.delta)
 #Get a legend and plot the vertical
-	synplot = matplotlib.pyplot.figure(1)
-	matplotlib.pyplot.subplot(311)
+	synplot = figure(1)
+	subplot(311)
 	titlelegend = vertcomps[0].stats.network + ' ' + vertcomps[0].stats.station + ' '
 	stime = str(vertcomps[0].stats.starttime.year) + ' ' + str(vertcomps[0].stats.starttime.julday) + ' ' + \
 	str(vertcomps[0].stats.starttime.hour) + ':' + str(vertcomps[0].stats.starttime.minute) + \
@@ -338,7 +352,7 @@ for sta in stations:
 	dist= gps2DistAzimuth(float(cmtlat),float(cmtlon),lat,lon)
 	dist ="{0:.2f}".format( 0.0089932 * dist[0] / 1000)
 	titlelegend = titlelegend + 'Distance:' + str(dist) + ' degrees'
-	matplotlib.pyplot.title(titlelegend)
+	title(titlelegend)
 	vertcomps.sort(['location'])
 	for comps in vertcomps:
 		if comps.stats.channel == 'LXZ':
@@ -349,8 +363,8 @@ for sta in stations:
 			curcolor = 'r'
 		else:
 			curcolor = 'c'
-		matplotlib.pyplot.plot(tz,comps.data, curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
-	matplotlib.pyplot.legend()
+		plot(tz,(comps.data*(10**3)), curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
+	legend()
 
 
 	finalstream += synstream.select(component="N")
@@ -360,7 +374,7 @@ for sta in stations:
 	if debug:
 		print "Here is the final stream:"
 		print(finalstream)
-	matplotlib.pyplot.subplot(312)
+	subplot(312)
 	tne=numpy.arange(0,finalstream[0].stats.npts / finalstream[0].stats.sampling_rate, finalstream[0].stats.delta)
 	for comps in finalstream.select(component="N"):
 		if comps.stats.channel == 'LXN':
@@ -371,10 +385,10 @@ for sta in stations:
 			curcolor = 'r'
 		else:
 			curcolor = 'c'
-		matplotlib.pyplot.plot(tne,comps.data,curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
-	matplotlib.pyplot.legend()
-	matplotlib.pyplot.ylabel('Velocity (m/s)')	
-	matplotlib.pyplot.subplot(313)
+		plot(tne,(comps.data*(10**3)),curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
+	legend()
+	ylabel('Displacement (mm)')	
+	subplot(313)
 	for comps in finalstream.select(component="E"):
 		if comps.stats.channel == 'LXE':
 			curcolor = 'k'
@@ -384,15 +398,13 @@ for sta in stations:
 			curcolor = 'r'
 		else:
 			curcolor = 'c'
-		matplotlib.pyplot.plot(tne,comps.data,curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
-	matplotlib.pyplot.legend()
-	matplotlib.pyplot.xlabel('Time (s)')
-
-	matplotlib.pyplot.savefig(os.getcwd() + '/' + resultdir + '/' + cursta + \
+		plot(tne,(comps.data*(10**3)),curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
+	legend()
+	xlabel('Time (s)')
+	savefig(os.getcwd() + '/' + resultdir + '/' + cursta + \
 	str(vertcomps[0].stats.starttime.year) + str(vertcomps[0].stats.starttime.julday) + \
-	str(vertcomps[0].stats.starttime.hour) + str(vertcomps[0].stats.starttime.minute) + '.jpeg', format = 'jpeg', \
-	orientation = 'landscape')
-#	matplotlib.pyplot.show()
+	str(vertcomps[0].stats.starttime.hour) + str(vertcomps[0].stats.starttime.minute) + '.jpg', format = 'jpeg')
+
 	synplot.clear()
 
 

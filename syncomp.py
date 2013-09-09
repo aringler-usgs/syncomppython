@@ -13,7 +13,7 @@ from time import gmtime, strftime
 from obspy.core.util.geodetics import gps2DistAzimuth
 import math
 
-debug=True
+debug=False
 datalessloc = '/APPS/metadata/SEED/'
 userminfre = .005
 usermaxfre = .01
@@ -40,6 +40,27 @@ def getorientation(net,sta,loc,chan,evetime,xseedval):
 						azimuth = blkt.azimuth
 	return azimuth
 
+
+def getdip(net,sta,loc,chan,evetime,xseedval):
+#A function to get the dip of a station at a specific time
+	for cursta in xseedval.stations:
+#As we scan through blockettes we need to find blockettes 50 and 52
+		for blkt in cursta:
+			if blkt.id == 50:
+#Pull the station info for blockette 50
+				stacall = blkt.station_call_letters.strip()
+			if stacall == sta:
+				if blkt.id == 52 and blkt.location_identifier == loc and blkt.channel_identifier == chan:
+					if type(blkt.end_date) is str:
+						curdoy = strftime("%j",gmtime())
+						curyear = strftime("%Y",gmtime())
+						curtime = UTCDateTime(curyear + "-" + curdoy + "T00:00:00.0") 
+						if blkt.start_date <= evetime:
+							dip = blkt.dip
+					elif blkt.start_date <= evetime and blkt.end_date >= evetime:
+						dip = blkt.dip
+	return dip
+
 def rotatehorizontal(stream, angle):
 #Function to rotate the data by a given angle
         theta_r = math.radians(angle)
@@ -47,8 +68,8 @@ def rotatehorizontal(stream, angle):
         rotatedN = stream[0].copy()
         rotatedE = stream[1].copy()
 # assign rotated data
-        rotatedN.data = stream[0].data*math.cos(theta_r) + stream[1].data*math.sin(theta_r)
-        rotatedE.data = stream[1].data*math.cos(theta_r) - stream[0].data*math.sin(theta_r)
+        rotatedN.data = stream[0].data*math.cos(- theta_r) + stream[1].data*math.sin(- theta_r)
+        rotatedE.data = stream[1].data*math.cos(- theta_r) - stream[0].data*math.sin(- theta_r)
 	rotatedN.stats.channel='LHN'
 	rotatedE.stats.channel='LHE'
 # return new streams object with rotated traces
@@ -169,10 +190,6 @@ except:
 
 
 
-
-
-
-
 #Now we can continue like there is no difference between Princeton and our Synthetics
 #Lets get the event time from the cmt
 cmtline1 = ' '.join(cmt[0].split())
@@ -213,13 +230,13 @@ for sta in stations:
 	try:
 		st = read('/' + dataloc + '/seed/' + net + '_' + cursta + '/' + str(eventtime.year) + \
 		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '_' + net + '_' + cursta + '/*LH*.seed', \
-		starttime=eventtime-2000,endtime=(eventtime+lents+2000))
+		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
 		st += read('/' + dataloc + '/seed/' + net + '_' + cursta + '/' + str(eventtime.year) + \
 		'/' + str(eventtime.year) + '_' + str(eventtime.julday + 1).zfill(3) + '_' + net + '_' + cursta + '/*LH*.seed', \
-		starttime=eventtime-2000,endtime=(eventtime+lents+2000))
+		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
 		st += read('/' + dataloc + '/seed/' + net + '_' + cursta + '/' + str(eventtime.year) + \
 		'/' + str(eventtime.year) + '_' + str(eventtime.julday - 1).zfill(3) + '_' + net + '_' + cursta + '/*LH*.seed', \
-		starttime=eventtime-2000,endtime=(eventtime+lents+2000))
+		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
 	except:
 		print('No data for ' + net + ' ' + cursta)
 		continue
@@ -244,6 +261,11 @@ for sta in stations:
 	horizontalstream = st	
 	finalstream=Stream()
 	for trace in horizontalstream.select(component="Z"):
+		dipval = getdip(net,cursta,trace.stats.location,trace.stats.channel,eventtime,sp)
+		if debug:
+			print 'Here is the dip value:' + str(dipval)
+		if dipval == 90:
+			trace.data = -trace.data
 		finalstream += trace
 		horizontalstream.remove(trace)
 
@@ -260,11 +282,11 @@ for sta in stations:
 		curlochorizontal = horizontalstream.select(location=curloc)
 		if debug:
 			print "Here are the number of traces:" + str(len(curlochorizontal)) + " which should be 2"
-			azi=getorientation(net,cursta,curloc,curlochorizontal[0].stats.channel,eventtime,sp)
-			if debug:
-				print "Here is the azimuth" + str(azi)
-			curlochorizontal = choptocommon(curlochorizontal)
-			finalstream += rotatehorizontal(curlochorizontal,azi)	
+		azi=getorientation(net,cursta,curloc,curlochorizontal[0].stats.channel,eventtime,sp)
+		if debug:
+			print "Here is the azimuth" + str(azi)
+		curlochorizontal = choptocommon(curlochorizontal)
+		finalstream += rotatehorizontal(curlochorizontal,azi)	
 			
 	if debug:
 		print(finalstream)
@@ -317,29 +339,52 @@ for sta in stations:
 	dist ="{0:.2f}".format( 0.0089932 * dist[0] / 1000)
 	titlelegend = titlelegend + 'Distance:' + str(dist) + ' degrees'
 	matplotlib.pyplot.title(titlelegend)
+	vertcomps.sort(['location'])
 	for comps in vertcomps:
-		matplotlib.pyplot.plot(tz,comps.data, label=comps.stats.location + ' ' + comps.stats.channel)
+		if comps.stats.channel == 'LXZ':
+			curcolor = 'k'
+		elif comps.stats.location == '00':
+			curcolor = 'g'
+		elif comps.stats.location == '10':
+			curcolor = 'r'
+		else:
+			curcolor = 'c'
+		matplotlib.pyplot.plot(tz,comps.data, curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
 	matplotlib.pyplot.legend()
 
 
 	finalstream += synstream.select(component="N")
 	finalstream += synstream.select(component="E")
 	finalstream = choptocommon(finalstream)
+	finalstream.sort(['location','channel'])
 	if debug:
 		print "Here is the final stream:"
 		print(finalstream)
 	matplotlib.pyplot.subplot(312)
 	tne=numpy.arange(0,finalstream[0].stats.npts / finalstream[0].stats.sampling_rate, finalstream[0].stats.delta)
 	for comps in finalstream.select(component="N"):
-		if debug:
-			print 'Here is one of the components'
-			print comps.stats
-		matplotlib.pyplot.plot(tne,comps.data, label=comps.stats.location + ' ' + comps.stats.channel)
+		if comps.stats.channel == 'LXN':
+			curcolor = 'k'
+		elif comps.stats.location == '00':
+			curcolor = 'g'
+		elif comps.stats.location == '10':
+			curcolor = 'r'
+		else:
+			curcolor = 'c'
+		matplotlib.pyplot.plot(tne,comps.data,curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
 	matplotlib.pyplot.legend()
 	matplotlib.pyplot.ylabel('Velocity (m/s)')	
 	matplotlib.pyplot.subplot(313)
 	for comps in finalstream.select(component="E"):
-		matplotlib.pyplot.plot(tne,comps.data, label=comps.stats.location + ' ' + comps.stats.channel)
+		if comps.stats.channel == 'LXE':
+			curcolor = 'k'
+		elif comps.stats.location == '00':
+			curcolor = 'g'
+		elif comps.stats.location == '10':
+			curcolor = 'r'
+		else:
+			curcolor = 'c'
+		matplotlib.pyplot.plot(tne,comps.data,curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
 	matplotlib.pyplot.legend()
 	matplotlib.pyplot.xlabel('Time (s)')
 

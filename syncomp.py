@@ -18,7 +18,7 @@ debug=False
 datalessloc = '/APPS/metadata/SEED/'
 userminfre = .005
 usermaxfre = .01
-lents = 8000
+lents = 4000
 
 
 def getorientation(net,sta,loc,chan,evetime,xseedval):
@@ -350,9 +350,12 @@ for sta in stations:
 		print "CMT Latitude:" + str(cmtlat)
 		print "CMT Longitude:" + str(cmtlon)
 	dist= gps2DistAzimuth(float(cmtlat),float(cmtlon),lat,lon)
+	bazi ="{0:.2f}".format(dist[2])
 	dist ="{0:.2f}".format( 0.0089932 * dist[0] / 1000)
+	
 	titlelegend = titlelegend + 'Distance:' + str(dist) + ' degrees'
-	title(titlelegend)
+	titlelegend = titlelegend + ' Back Azi:' + str(bazi) + 'degrees'
+	title(titlelegend,fontsize=12)
 	vertcomps.sort(['location'])
 	for comps in vertcomps:
 		if comps.stats.channel == 'LXZ':
@@ -364,7 +367,7 @@ for sta in stations:
 		else:
 			curcolor = 'c'
 		plot(tz,(comps.data*(10**3)), curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
-	legend()
+	legend(prop={'size':6})
 
 
 	finalstream += synstream.select(component="N")
@@ -386,7 +389,7 @@ for sta in stations:
 		else:
 			curcolor = 'c'
 		plot(tne,(comps.data*(10**3)),curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
-	legend()
+	legend(prop={'size':6})
 	ylabel('Displacement (mm)')	
 	subplot(313)
 	for comps in finalstream.select(component="E"):
@@ -399,11 +402,11 @@ for sta in stations:
 		else:
 			curcolor = 'c'
 		plot(tne,(comps.data*(10**3)),curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
-	legend()
+	legend(prop={'size':6})
 	xlabel('Time (s)')
 	savefig(os.getcwd() + '/' + resultdir + '/' + cursta + \
 	str(vertcomps[0].stats.starttime.year) + str(vertcomps[0].stats.starttime.julday) + \
-	str(vertcomps[0].stats.starttime.hour) + str(vertcomps[0].stats.starttime.minute) + '.jpg', format = 'jpeg')
+	str(vertcomps[0].stats.starttime.hour) + str(vertcomps[0].stats.starttime.minute) + '.jpg', format = 'jpeg', dpi=400)
 
 	synplot.clear()
 

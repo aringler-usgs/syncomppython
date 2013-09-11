@@ -20,6 +20,10 @@ userminfre = .005
 usermaxfre = .01
 lents = 4000
 
+manstalist=False
+stations=['IU PET','IU ANMO']
+
+
 
 def getorientation(net,sta,loc,chan,evetime,xseedval):
 #A function to get the orientation of a station at a specific time
@@ -63,6 +67,9 @@ def getdip(net,sta,loc,chan,evetime,xseedval):
 	return dip
 
 def rotatehorizontal(stream, angle):
+	if stream[0].stats.channel in set(['LHE','LHN']):
+		stream.sort(['channel'],reverse=False)
+		stream[1].data = -stream[1].data
 #Function to rotate the data by a given angle
         theta_r = math.radians(angle)
 # create new trace objects with same info as previous
@@ -179,27 +186,51 @@ def readcmt(cmt):
 
 
 def getdata(net,sta,eventtime,lents):
-	if net in set(['IW','NE','US']):	
-		dataloc = 'xs1'	
-	elif net in set(['IU','IC','CU']):
-		dataloc = 'xs0'	
 	
-	st = read('/' + dataloc + '/seed/' + net + '_' + sta + '/' + str(eventtime.year) + \
-	'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '_' + net + '_' + sta + '/*LH*.seed', \
-	starttime=eventtime-3000,endtime=(eventtime+lents+3000))
-	st += read('/' + dataloc + '/seed/' + net + '_' + sta + '/' + str(eventtime.year) + \
-	'/' + str(eventtime.year) + '_' + str(eventtime.julday + 1).zfill(3) + '_' + net + '_' + sta + '/*LH*.seed', \
-	starttime=eventtime-3000,endtime=(eventtime+lents+3000))
-	st += read('/' + dataloc + '/seed/' + net + '_' + sta + '/' + str(eventtime.year) + \
-	'/' + str(eventtime.year) + '_' + str(eventtime.julday - 1).zfill(3) + '_' + net + '_' + sta + '/*LH*.seed', \
-	starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+	if net == 'II':
+		st = read('/tr1/telemetry_days/' + net + '_' + sta + '/' + str(eventtime.year) + \
+		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '/*LH*.seed', \
+		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+		st += read('/tr1/telemetry_days/' + net + '_' + sta + '/' + str(eventtime.year) + \
+		'/' + str(eventtime.year) + '_' + str(eventtime.julday + 1).zfill(3) + '/*LH*.seed', \
+		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+		st += read('/tr1/telemetry_days/' + net + '_' + sta + '/' + str(eventtime.year) + \
+		'/' + str(eventtime.year) + '_' + str(eventtime.julday - 1).zfill(3) + '/*LH*.seed', \
+		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+
+	else:
+		if net in set(['IW','NE','US']):	
+			dataloc = 'xs1'	
+		elif net in set(['IU','IC','CU']):
+			dataloc = 'xs0'	
+		st = read('/' + dataloc + '/seed/' + net + '_' + sta + '/' + str(eventtime.year) + \
+		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '_' + net + '_' + sta + '/*LH*.seed', \
+		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+		st += read('/' + dataloc + '/seed/' + net + '_' + sta + '/' + str(eventtime.year) + \
+		'/' + str(eventtime.year) + '_' + str(eventtime.julday + 1).zfill(3) + '_' + net + '_' + sta + '/*LH*.seed', \
+		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+		st += read('/' + dataloc + '/seed/' + net + '_' + sta + '/' + str(eventtime.year) + \
+		'/' + str(eventtime.year) + '_' + str(eventtime.julday - 1).zfill(3) + '_' + net + '_' + sta + '/*LH*.seed', \
+		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+	
 	st.merge(fill_value='latest')
 	if debug:
 		print 'We have data'
 
 	return st
 
-
+def getcolor(chan,loc):
+	if chan in set(['LXN','LXE','LXZ']):
+		color = 'k'
+	elif (loc == '00' or loc ==''):
+		color = 'g'
+	elif loc == '10':
+		color = 'r'
+	elif loc == '60':
+		color = 'c'
+	else:
+		color = 'b'
+	return color
 
 
 #Start of the main part of the program
@@ -233,8 +264,9 @@ try:
 except:
 	print "Can not read the dataless."
 	exit(0)
+if not manstalist:
+	stations = getstalist(sp,eventtime,curnet)
 
-stations = getstalist(sp,eventtime,curnet)
 if debug:
 	print "Here are the stations we found"	
 	for sta in stations:
@@ -311,13 +343,13 @@ for sta in stations:
 		if debug:
 			print(cursyn)
 		curtrace = read(cursyn)
-		curtrace.integrate()
-		curtrace.integrate()
 		curtrace[0].data = curtrace[0].data/(10**9)
 		curtrace.taper(type='cosine')
 		pazfake= {'poles': [1-1j], 'zeros': [1-1j], 'gain':1,'sensitivity': 1}
 		curtrace.simulate(paz_remove=pazfake, paz_simulate=pazfake)
 		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=4)
+		curtrace.integrate()
+		curtrace.integrate()
 		curtrace[0].stats.channel=(curtrace[0].stats.channel).replace('LH','LX')
 		synstream += curtrace
 			
@@ -350,22 +382,18 @@ for sta in stations:
 		print "CMT Latitude:" + str(cmtlat)
 		print "CMT Longitude:" + str(cmtlon)
 	dist= gps2DistAzimuth(float(cmtlat),float(cmtlon),lat,lon)
-	bazi ="{0:.2f}".format(dist[2])
-	dist ="{0:.2f}".format( 0.0089932 * dist[0] / 1000)
+	bazi ="{0:.1f}".format(dist[2])
+	dist ="{0:.1f}".format( 0.0089932 * dist[0] / 1000)
 	
-	titlelegend = titlelegend + 'Distance:' + str(dist) + ' degrees'
-	titlelegend = titlelegend + ' Back Azi:' + str(bazi) + 'degrees'
+	titlelegend = titlelegend + 'Dist:' + str(dist) 
+	titlelegend = titlelegend + ' BAzi:' + str(bazi) 
+	minper = "{0:.0f}".format(1/usermaxfre)
+	maxper = "{0:.0f}".format(1/userminfre)
+	titlelegend = titlelegend + ' ' + str(minper) + '-' + str(maxper) + ' s per.'
 	title(titlelegend,fontsize=12)
 	vertcomps.sort(['location'])
 	for comps in vertcomps:
-		if comps.stats.channel == 'LXZ':
-			curcolor = 'k'
-		elif comps.stats.location == '00':
-			curcolor = 'g'
-		elif comps.stats.location == '10':
-			curcolor = 'r'
-		else:
-			curcolor = 'c'
+		curcolor = getcolor(comps.stats.channel,comps.stats.location)
 		plot(tz,(comps.data*(10**3)), curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
 	legend(prop={'size':6})
 
@@ -380,27 +408,14 @@ for sta in stations:
 	subplot(312)
 	tne=numpy.arange(0,finalstream[0].stats.npts / finalstream[0].stats.sampling_rate, finalstream[0].stats.delta)
 	for comps in finalstream.select(component="N"):
-		if comps.stats.channel == 'LXN':
-			curcolor = 'k'
-		elif comps.stats.location == '00':
-			curcolor = 'g'
-		elif comps.stats.location == '10':
-			curcolor = 'r'
-		else:
-			curcolor = 'c'
+		curcolor = getcolor(comps.stats.channel,comps.stats.location)
+		
 		plot(tne,(comps.data*(10**3)),curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
 	legend(prop={'size':6})
 	ylabel('Displacement (mm)')	
 	subplot(313)
 	for comps in finalstream.select(component="E"):
-		if comps.stats.channel == 'LXE':
-			curcolor = 'k'
-		elif comps.stats.location == '00':
-			curcolor = 'g'
-		elif comps.stats.location == '10':
-			curcolor = 'r'
-		else:
-			curcolor = 'c'
+		curcolor = getcolor(comps.stats.channel,comps.stats.location)
 		plot(tne,(comps.data*(10**3)),curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
 	legend(prop={'size':6})
 	xlabel('Time (s)')

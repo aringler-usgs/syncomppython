@@ -255,6 +255,12 @@ cmtlat, cmtlon, eventtime = readcmt(cmt)
 resultdir = sys.argv[2]
 if not os.path.exists(os.getcwd() + '/' + resultdir):
 	os.mkdir(os.getcwd() + '/' + resultdir)
+evename = synfile.split("/")
+evename = evename[len(evename)-1]
+resf = open(os.getcwd() + '/' + resultdir + '/Res' + evename,'w')
+
+
+
 
 curnet = sys.argv[3]
 
@@ -425,4 +431,4 @@ for sta in stations:
 
 	synplot.clear()
 
-
+resf.close()

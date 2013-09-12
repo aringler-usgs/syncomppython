@@ -6,6 +6,7 @@ import glob
 import numpy
 import matplotlib
 import math
+import warnings
 from matplotlib.pyplot import (figure,axes,plot,xlabel,ylabel,title,subplot,legend,savefig,show)
 from obspy import read, Stream
 from obspy.core import UTCDateTime
@@ -14,14 +15,14 @@ from time import gmtime, strftime
 from obspy.core.util.geodetics import gps2DistAzimuth
 
 
-debug=False
+debug=True
 datalessloc = '/APPS/metadata/SEED/'
 userminfre = .005
 usermaxfre = .01
 lents = 4000
 
 manstalist=False
-stations=['IU PET','IU ANMO']
+stations=['IC WMQ']
 
 
 
@@ -219,6 +220,64 @@ def getdata(net,sta,eventtime,lents):
 
 	return st
 
+def getPAZ2(sp,net,sta,loc,chan,eventtime):
+        data = {}
+	station_flag = False
+	channel_flag = False
+	for statemp in sp.stations:
+		for blockette in statemp:
+			if blockette.id == 50:
+				station_flag = False
+				if net == blockette.network_code and sta == blockette.station_call_letters:
+					station_flag = True
+					if debug:
+						print 'We found the station blockettes'
+			elif blockette.id == 52 and station_flag:
+				channel_flag = False
+				if blockette.location_identifier == loc and blockette.channel_identifier == chan:
+					if debug:
+						print 'We are in the location and channel blockette'
+						print 'End date: ' + str(blockette.end_date)
+						print 'Start date: ' + str(blockette.start_date)
+					if type(blockette.end_date) is str:
+						curdoy = strftime("%j",gmtime())
+						curyear = strftime("%Y",gmtime())
+						curtime = UTCDateTime(curyear + "-" + curdoy + "T00:00:00.0") 
+						if blockette.start_date <= eventtime:
+							channel_flag = True
+							if debug:
+								print 'We found the channel blockette'
+					elif blockette.start_date <= eventtime and blockette.end_date >= eventtime:
+						channel_flag = True
+						if debug:
+							print 'We found the channel blockette'
+			elif blockette.id == 58 and channel_flag and station_flag:
+				if blockette.stage_sequence_number == 0:
+					data['sensitivity'] = blockette.sensitivity_gain
+				elif blockette.stage_sequence_number == 1:
+					data['seismometer_gain'] = blockette.sensitivity_gain
+				elif blockette.stage_sequence_number == 2:
+					data['digitizer_gain'] = blockette.sensitivity_gain
+			elif blockette.id == 53 and channel_flag and station_flag:
+				data['gain'] = blockette.A0_normalization_factor
+				data['poles'] = []
+				if not blockette.transfer_function_types == 'A':
+					msg = 'Only supporting Laplace transform response ' + \
+					'type. Skipping other response information.'
+					warnings.warn(msg, UserWarning)
+					continue
+				for i in range(blockette.number_of_complex_poles):
+					p = complex(blockette.real_pole[i], blockette.imaginary_pole[i])
+					data['poles'].append(p)
+				data['zeros'] = []
+				for i in range(blockette.number_of_complex_zeros):
+					z = complex(blockette.real_zero[i], blockette.imaginary_zero[i])
+					data['zeros'].append(z)
+        return data
+
+
+
+
 def getcolor(chan,loc):
 	if chan in set(['LXN','LXE','LXZ']):
 		color = 'k'
@@ -296,8 +355,9 @@ for sta in stations:
 #Lets go through each trace in the stream and deconvolve and filter
 	for trace in st:
 #Here we get the response and remove it
+#Here is where I am mucking around		
+		paz=getPAZ2(sp,net,cursta,trace.stats.location,trace.stats.channel,eventtime)
 		try:
-			paz=sp.getPAZ(net + '.' + cursta + '.' + trace.stats.location + '.' + trace.stats.channel,datetime=eventtime)
 			trace.integrate()
 			trace.taper(type='cosine')				
 			trace.simulate(paz_remove=paz)

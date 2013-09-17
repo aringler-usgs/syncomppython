@@ -17,7 +17,7 @@ from obspy.core.util.geodetics import gps2DistAzimuth
 
 debug=True
 datalessloc = '/APPS/metadata/SEED/'
-userminfre = .005
+userminfre = .0025
 usermaxfre = .01
 lents = 4000
 
@@ -301,16 +301,21 @@ cmtlat, cmtlon, eventtime, tshift = readcmt(cmt)
 
 #Lets make a local results directory
 resultdir = sys.argv[2]
+if resultdir[-1] == '/':
+	resultdir = resultdir[:-1]
+
 if not os.path.exists(os.getcwd() + '/' + resultdir):
 	os.mkdir(os.getcwd() + '/' + resultdir)
 evename = synfile.split("/")
 evename = evename[len(evename)-1]
 
-
-
-
-
 curnet = sys.argv[3]
+
+statfile = open(os.getcwd() + '/' + resultdir + '/Results' + evename + curnet + '.csv' ,'w')
+
+
+
+
 
 #Lets read in the dataless
 try:
@@ -350,11 +355,12 @@ for sta in stations:
 			trace.taper(type='cosine')
 			trace.simulate(paz_remove=paz)
 #Here we filter
-			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=4)
+			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=2)
 			trace.integrate()
 			trace.taper(type='cosine')
 			trace.trim(starttime=eventtime + tshift/2,endtime=(eventtime+lents + tshift/2))
 			trace.detrend()
+			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=2)
 		except:
 			print('Can not find the response')
 			st.remove(trace)
@@ -401,13 +407,14 @@ for sta in stations:
 		curtrace[0].data = curtrace[0].data/(10**9)
 		curtrace[0].stats.starttime = curtrace[0].stats.starttime + tshift/2
 		curtrace.taper(type='cosine')
-		pazfake= {'poles': [1-1j], 'zeros': [1-1j], 'gain':1,'sensitivity': 1}
-		curtrace.simulate(paz_remove=pazfake, paz_simulate=pazfake)
-		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=4)
+#		pazfake= {'poles': [1-1j], 'zeros': [1-1j], 'gain':1,'sensitivity': 1}
+#		curtrace.simulate(paz_remove=pazfake, paz_simulate=pazfake)
+		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=2)
 		curtrace.integrate()
 		curtrace.integrate()
 		curtrace.taper(type='cosine')
 		curtrace.detrend()
+		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=2)
 		curtrace[0].stats.channel=(curtrace[0].stats.channel).replace('LH','LX')
 		synstream += curtrace
 			
@@ -456,8 +463,7 @@ for sta in stations:
 	legend(prop={'size':6})
 
 
-	finalstream += synstream.select(component="N")
-	finalstream += synstream.select(component="E")
+	finalstream += synstream
 	finalstream = choptocommon(finalstream)
 	finalstream.sort(['location','channel'])
 	if debug:
@@ -483,4 +489,22 @@ for sta in stations:
 
 	synplot.clear()
 
+#Time to write some info into the statfile
+#Write the network and the station
+	statfile.write(net + "," + cursta + "," + str(dist) + "," + str(bazi))
+	
 
+
+	
+#Lets get an RMS from the synthetic and the data
+	
+
+
+
+
+
+
+
+
+
+statfile.close()

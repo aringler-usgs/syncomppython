@@ -22,9 +22,7 @@ usermaxfre = .01
 lents = 4000
 
 manstalist=False
-stations=['IC WMQ']
-
-
+stations=['IU CASY']
 
 def getorientation(net,sta,loc,chan,evetime,xseedval):
 #A function to get the orientation of a station at a specific time
@@ -45,7 +43,6 @@ def getorientation(net,sta,loc,chan,evetime,xseedval):
 					elif blkt.start_date <= evetime and blkt.end_date >= evetime:
 						azimuth = blkt.azimuth
 	return azimuth
-
 
 def getdip(net,sta,loc,chan,evetime,xseedval):
 #A function to get the dip of a station at a specific time
@@ -139,8 +136,6 @@ def getlatlon(sta,etime,xseedval):
 					elif blkt.start_effective_date <= etime and blkt.end_effective_date >= etime:
 						lat = blkt.latitude
 						lon = blkt.longitude	
-
-
 	return lat,lon
 
 def getstalist(sp,etime,curnet):
@@ -167,60 +162,57 @@ def getstalist(sp,etime,curnet):
 	return stations
 
 def readcmt(cmt):
+	debugreadcmt = False
 #Now we can continue like there is no difference between Princeton and our Synthetics
 #Lets get the event time from the cmt
 	cmtline1 = ' '.join(cmt[0].split())
 	cmtlat = cmt[4].replace('latitude:','').strip()
 	cmtlon = cmt[5].replace('longitude:','').strip()
-	if debug:
+	tshift = float(cmt[2].replace('time shift:','').strip())
+	if debugreadcmt:
 		print cmtline1
 	cmtline1 = cmtline1.split()
-	if debug:
+	if debugreadcmt:
 		print cmtline1[1] + ' ' + cmtline1[2] + ' ' + cmtline1[3] + ' ' + cmtline1[4] + ' ' + cmtline1[5] + ' ' + cmtline1[6]
 	eventtime = UTCDateTime(int(cmtline1[1]),int(cmtline1[2]),int(cmtline1[3]),int(cmtline1[4]),int(cmtline1[5]),float(cmtline1[6]))
-	if debug:
+	if debugreadcmt:
 		print 'Year:' + str(eventtime.year)
 		print 'Day:' + str(eventtime.julday)
 		print 'Hour:' + str(eventtime.hour)
 		print 'Minute:' + str(eventtime.minute)
-	return cmtlat, cmtlon, eventtime
-
+	return cmtlat, cmtlon, eventtime, tshift
 
 def getdata(net,sta,eventtime,lents):
-	
+#This function goes to one of the archives and gets the data
+	debuggetdata = False
+	preeventday = eventtime - 24*60*60
+	posteventday = eventtime + 24*60*60
+#If II get off of /tr1 else get the data from /xs0 or /xs1
 	if net == 'II':
-		st = read('/tr1/telemetry_days/' + net + '_' + sta + '/' + str(eventtime.year) + \
-		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '/*LH*.seed', \
-		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
-		st += read('/tr1/telemetry_days/' + net + '_' + sta + '/' + str(eventtime.year) + \
-		'/' + str(eventtime.year) + '_' + str(eventtime.julday + 1).zfill(3) + '/*LH*.seed', \
-		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
-		st += read('/tr1/telemetry_days/' + net + '_' + sta + '/' + str(eventtime.year) + \
-		'/' + str(eventtime.year) + '_' + str(eventtime.julday - 1).zfill(3) + '/*LH*.seed', \
-		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
-
+		dataprefix = '/tr1/telemetry_days/'
 	else:
 		if net in set(['IW','NE','US']):	
-			dataloc = 'xs1'	
-		elif net in set(['IU','IC','CU']):
-			dataloc = 'xs0'	
-		st = read('/' + dataloc + '/seed/' + net + '_' + sta + '/' + str(eventtime.year) + \
-		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '_' + net + '_' + sta + '/*LH*.seed', \
-		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
-		st += read('/' + dataloc + '/seed/' + net + '_' + sta + '/' + str(eventtime.year) + \
-		'/' + str(eventtime.year) + '_' + str(eventtime.julday + 1).zfill(3) + '_' + net + '_' + sta + '/*LH*.seed', \
-		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
-		st += read('/' + dataloc + '/seed/' + net + '_' + sta + '/' + str(eventtime.year) + \
-		'/' + str(eventtime.year) + '_' + str(eventtime.julday - 1).zfill(3) + '_' + net + '_' + sta + '/*LH*.seed', \
-		starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+			dataprefix = 'xs1'	
+		else:
+			dataprefix = 'xs0'
+		dataprefix = '/' + dataprefix + '/seed/'
 	
+	st = read(dataprefix + net + '_' + sta + '/' + str(eventtime.year) + \
+	'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '*/*LH*.seed', \
+	starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+	st += read(dataprefix + net + '_' + sta + '/' + str(posteventday.year) + \
+	'/' + str(posteventday.year) + '_' + str(posteventday.julday).zfill(3) + '*/*LH*.seed', \
+	starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+	st += read(dataprefix + net + '_' + sta + '/' + str(preeventday.year) + \
+	'/' + str(preeventday.year) + '_' + str(preeventday.julday).zfill(3) + '*/*LH*.seed', \
+	starttime=eventtime-3000,endtime=(eventtime+lents+3000))
 	st.merge(fill_value='latest')
-	if debug:
+	if debuggetdata:
 		print 'We have data'
-
 	return st
 
 def getPAZ2(sp,net,sta,loc,chan,eventtime):
+	debuggetPAZ2 = False
         data = {}
 	station_flag = False
 	channel_flag = False
@@ -230,12 +222,12 @@ def getPAZ2(sp,net,sta,loc,chan,eventtime):
 				station_flag = False
 				if net == blockette.network_code and sta == blockette.station_call_letters:
 					station_flag = True
-					if debug:
+					if debuggetPAZ2:
 						print 'We found the station blockettes'
 			elif blockette.id == 52 and station_flag:
 				channel_flag = False
 				if blockette.location_identifier == loc and blockette.channel_identifier == chan:
-					if debug:
+					if debuggetPAZ2:
 						print 'We are in the location and channel blockette'
 						print 'End date: ' + str(blockette.end_date)
 						print 'Start date: ' + str(blockette.start_date)
@@ -245,11 +237,11 @@ def getPAZ2(sp,net,sta,loc,chan,eventtime):
 						curtime = UTCDateTime(curyear + "-" + curdoy + "T00:00:00.0") 
 						if blockette.start_date <= eventtime:
 							channel_flag = True
-							if debug:
+							if debuggetPAZ2:
 								print 'We found the channel blockette'
 					elif blockette.start_date <= eventtime and blockette.end_date >= eventtime:
 						channel_flag = True
-						if debug:
+						if debuggetPAZ2:
 							print 'We found the channel blockette'
 			elif blockette.id == 58 and channel_flag and station_flag:
 				if blockette.stage_sequence_number == 0:
@@ -274,9 +266,6 @@ def getPAZ2(sp,net,sta,loc,chan,eventtime):
 					z = complex(blockette.real_zero[i], blockette.imaginary_zero[i])
 					data['zeros'].append(z)
         return data
-
-
-
 
 def getcolor(chan,loc):
 	if chan in set(['LXN','LXE','LXZ']):
@@ -308,7 +297,7 @@ if not os.path.isfile(synfile + '/CMTSOLUTION'):
 	print "No CMT found"
 	exit(0)
 cmt = tuple(open(synfile + '/CMTSOLUTION'))
-cmtlat, cmtlon, eventtime = readcmt(cmt)
+cmtlat, cmtlon, eventtime, tshift = readcmt(cmt)
 
 #Lets make a local results directory
 resultdir = sys.argv[2]
@@ -316,7 +305,7 @@ if not os.path.exists(os.getcwd() + '/' + resultdir):
 	os.mkdir(os.getcwd() + '/' + resultdir)
 evename = synfile.split("/")
 evename = evename[len(evename)-1]
-resf = open(os.getcwd() + '/' + resultdir + '/Res' + evename,'w')
+
 
 
 
@@ -358,41 +347,41 @@ for sta in stations:
 #Here is where I am mucking around		
 		paz=getPAZ2(sp,net,cursta,trace.stats.location,trace.stats.channel,eventtime)
 		try:
-			trace.integrate()
-			trace.taper(type='cosine')				
+			trace.taper(type='cosine')
 			trace.simulate(paz_remove=paz)
 #Here we filter
 			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=4)
+			trace.integrate()
 			trace.taper(type='cosine')
-			trace.trim(starttime=eventtime,endtime=(eventtime+lents))
+			trace.trim(starttime=eventtime + tshift/2,endtime=(eventtime+lents + tshift/2))
+			trace.detrend()
 		except:
 			print('Can not find the response')
 			st.remove(trace)
-#Now we rotate the horizontals to E and W
-	horizontalstream = st	
+
+#Lets check for reverse polarity and fix 
 	finalstream=Stream()
-	for trace in horizontalstream.select(component="Z"):
+	for trace in st.select(component="Z"):
 		dipval = getdip(net,cursta,trace.stats.location,trace.stats.channel,eventtime,sp)
 		if debug:
 			print 'Here is the dip value:' + str(dipval)
-		if dipval == 90:
+		if dipval == 90.0:
 			trace.data = -trace.data
 		finalstream += trace
-		horizontalstream.remove(trace)
+		st.remove(trace)
 
-	if debug:
-		print 'Here are the horizontal traces:'
-		print(horizontalstream)
-
+#Now we rotate the horizontals to E and W
 	locations=[]
-	for trace in horizontalstream:
+	for trace in st:
 		locations.append(trace.stats.location)
 	locations=set(locations)
 
 	for curloc in locations:
-		curlochorizontal = horizontalstream.select(location=curloc)
+		curlochorizontal = st.select(location=curloc)
+		curlochorizontal.sort(['channel'])
 		if debug:
 			print "Here are the number of traces:" + str(len(curlochorizontal)) + " which should be 2"
+			print(curlochorizontal)
 		azi=getorientation(net,cursta,curloc,curlochorizontal[0].stats.channel,eventtime,sp)
 		if debug:
 			print "Here is the azimuth" + str(azi)
@@ -410,12 +399,15 @@ for sta in stations:
 			print(cursyn)
 		curtrace = read(cursyn)
 		curtrace[0].data = curtrace[0].data/(10**9)
+		curtrace[0].stats.starttime = curtrace[0].stats.starttime + tshift/2
 		curtrace.taper(type='cosine')
 		pazfake= {'poles': [1-1j], 'zeros': [1-1j], 'gain':1,'sensitivity': 1}
 		curtrace.simulate(paz_remove=pazfake, paz_simulate=pazfake)
 		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=4)
 		curtrace.integrate()
 		curtrace.integrate()
+		curtrace.taper(type='cosine')
+		curtrace.detrend()
 		curtrace[0].stats.channel=(curtrace[0].stats.channel).replace('LH','LX')
 		synstream += curtrace
 			
@@ -458,7 +450,7 @@ for sta in stations:
 	titlelegend = titlelegend + ' ' + str(minper) + '-' + str(maxper) + ' s per.'
 	title(titlelegend,fontsize=12)
 	vertcomps.sort(['location'])
-	for comps in vertcomps:
+	for comps in vertcomps.select(component="Z"):
 		curcolor = getcolor(comps.stats.channel,comps.stats.location)
 		plot(tz,(comps.data*(10**3)), curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
 	legend(prop={'size':6})
@@ -491,4 +483,4 @@ for sta in stations:
 
 	synplot.clear()
 
-resf.close()
+

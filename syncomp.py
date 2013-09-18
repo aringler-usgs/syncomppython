@@ -13,6 +13,7 @@ from obspy.core import UTCDateTime
 from obspy.xseed import Parser
 from time import gmtime, strftime
 from obspy.core.util.geodetics import gps2DistAzimuth
+from obspy.signal.cross_correlation import xcorr
 
 
 debug=True
@@ -20,9 +21,11 @@ datalessloc = '/APPS/metadata/SEED/'
 userminfre = .0025
 usermaxfre = .01
 lents = 4000
+#Use half the value you think you want e.g. 2 gives you a total of 4 poles
+filtercornerpoles = 2
 
 manstalist=False
-stations=['IU CASY']
+stations=['IU INCN']
 
 def getorientation(net,sta,loc,chan,evetime,xseedval):
 #A function to get the orientation of a station at a specific time
@@ -280,6 +283,30 @@ def getcolor(chan,loc):
 		color = 'b'
 	return color
 
+def writestats(statfile,streamin,comp):
+	try:
+		syncomp = "LX" + comp
+		datacomp = "LH" + comp
+		syn = streamin.select(channel = syncomp)
+		for tr in streamin.select(channel = datacomp):	
+			resi = "{0:.2f}".format(numpy.sum(tr.data*syn[0].data)/numpy.sum(numpy.square(syn[0].data)))
+			lag, corr = xcorr(tr,syn[0])
+			corr = "{0:.2f}".format(corr)
+			statfile.write("," + tr.stats.location + "," + tr.stats.channel + "," +  str(resi))
+			stafile.write("," + str(lag) + "," + str(corr) + "\n")
+	
+	except:	
+		if debug:
+			print 'No vertical residual for' + cursta + ' ' + 'LH' + comp	
+
+
+
+
+
+	return
+
+
+
 
 #Start of the main part of the program
 if not len(sys.argv) == 4:
@@ -355,12 +382,12 @@ for sta in stations:
 			trace.taper(type='cosine')
 			trace.simulate(paz_remove=paz)
 #Here we filter
-			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=2)
+			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
 			trace.integrate()
 			trace.taper(type='cosine')
 			trace.trim(starttime=eventtime + tshift/2,endtime=(eventtime+lents + tshift/2))
 			trace.detrend()
-			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=2)
+			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
 		except:
 			print('Can not find the response')
 			st.remove(trace)
@@ -409,12 +436,12 @@ for sta in stations:
 		curtrace.taper(type='cosine')
 #		pazfake= {'poles': [1-1j], 'zeros': [1-1j], 'gain':1,'sensitivity': 1}
 #		curtrace.simulate(paz_remove=pazfake, paz_simulate=pazfake)
-		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=2)
+		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
 		curtrace.integrate()
 		curtrace.integrate()
 		curtrace.taper(type='cosine')
 		curtrace.detrend()
-		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=2)
+		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
 		curtrace[0].stats.channel=(curtrace[0].stats.channel).replace('LH','LX')
 		synstream += curtrace
 			
@@ -492,9 +519,10 @@ for sta in stations:
 #Time to write some info into the statfile
 #Write the network and the station
 	statfile.write(net + "," + cursta + "," + str(dist) + "," + str(bazi))
+	writestats(statfile,vertcomps,'Z')
+	writestats(statfile,finalstream,'N')
+	writestats(statfile,finalstream,'E')
 	
-
-
 	
 #Lets get an RMS from the synthetic and the data
 	

@@ -18,6 +18,8 @@ from obspy.signal.cross_correlation import xcorr
 
 debug=True
 datalessloc = '/APPS/metadata/SEED/'
+#Here is the data location use True for xs0 otherwise use false
+dataloc = False
 userminfre = .0025
 usermaxfre = .01
 lents = 4000
@@ -185,7 +187,7 @@ def readcmt(cmt):
 		print 'Minute:' + str(eventtime.minute)
 	return cmtlat, cmtlon, eventtime, tshift
 
-def getdata(net,sta,eventtime,lents):
+def getdata(net,sta,eventtime,lents,dataloc):
 #This function goes to one of the archives and gets the data
 	debuggetdata = False
 	preeventday = eventtime - 24*60*60
@@ -199,6 +201,8 @@ def getdata(net,sta,eventtime,lents):
 		else:
 			dataprefix = 'xs0'
 		dataprefix = '/' + dataprefix + '/seed/'
+	if not dataloc:
+		dataprefix = '/tr1/telemetry_days/'
 	
 	st = read(dataprefix + net + '_' + sta + '/' + str(eventtime.year) + \
 	'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '*/*LH*.seed', \
@@ -285,24 +289,19 @@ def getcolor(chan,loc):
 
 def writestats(statfile,streamin,comp):
 	try:
-		syncomp = "LX" + comp
+		syncomp = "LX" + comp	
 		datacomp = "LH" + comp
 		syn = streamin.select(channel = syncomp)
 		for tr in streamin.select(channel = datacomp):	
 			resi = "{0:.2f}".format(numpy.sum(tr.data*syn[0].data)/numpy.sum(numpy.square(syn[0].data)))
-			lag, corr = xcorr(tr,syn[0])
+			lag, corr = xcorr(tr,syn[0],500)
 			corr = "{0:.2f}".format(corr)
 			statfile.write("," + tr.stats.location + "," + tr.stats.channel + "," +  str(resi))
-			stafile.write("," + str(lag) + "," + str(corr) + "\n")
+			statfile.write("," + str(lag) + "," + str(corr) + "\n")
 	
 	except:	
 		if debug:
-			print 'No vertical residual for' + cursta + ' ' + 'LH' + comp	
-
-
-
-
-
+			print 'No residual for' + cursta + ' ' + 'LH' + comp	
 	return
 
 
@@ -368,7 +367,7 @@ for sta in stations:
 	net = cursta[0]
 	cursta = cursta[1]
 	try:
-		st = getdata(net,cursta,eventtime,lents)
+		st = getdata(net,cursta,eventtime,lents,dataloc)
 	except:
 		print('No data for ' + net + ' ' + cursta)
 		continue

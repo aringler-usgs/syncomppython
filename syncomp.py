@@ -296,6 +296,7 @@ def writestats(statfile,streamin,comp):
 			resi = "{0:.2f}".format(numpy.sum(tr.data*syn[0].data)/numpy.sum(numpy.square(syn[0].data)))
 			lag, corr = xcorr(tr,syn[0],500)
 			corr = "{0:.2f}".format(corr)
+			statfile.write(tr.stats.network + "," + tr.stats.station)
 			statfile.write("," + tr.stats.location + "," + tr.stats.channel + "," +  str(resi))
 			statfile.write("," + str(lag) + "," + str(corr) + "\n")
 	
@@ -338,7 +339,7 @@ evename = evename[len(evename)-1]
 curnet = sys.argv[3]
 
 statfile = open(os.getcwd() + '/' + resultdir + '/Results' + evename + curnet + '.csv' ,'w')
-
+statfile.write('net,sta,loc,chan,scalefac,lag,corr\n')
 
 
 
@@ -517,7 +518,7 @@ for sta in stations:
 
 #Time to write some info into the statfile
 #Write the network and the station
-	statfile.write(net + "," + cursta + "," + str(dist) + "," + str(bazi))
+	#statfile.write(net + "," + cursta + "," + str(dist) + "," + str(bazi))
 	writestats(statfile,vertcomps,'Z')
 	writestats(statfile,finalstream,'N')
 	writestats(statfile,finalstream,'E')

@@ -16,7 +16,7 @@ from obspy.core.util.geodetics import gps2DistAzimuth
 from obspy.signal.cross_correlation import xcorr
 
 
-debug=True
+debug=False
 datalessloc = '/APPS/metadata/SEED/'
 #Here is the data location use True for xs0 otherwise use false
 dataloc = False
@@ -27,7 +27,7 @@ lents = 4000
 filtercornerpoles = 2
 
 manstalist=False
-stations=['IU INCN']
+stations=['IC BJT']
 
 def getorientation(net,sta,loc,chan,evetime,xseedval):
 #A function to get the orientation of a station at a specific time
@@ -174,6 +174,7 @@ def readcmt(cmt):
 	cmtlat = cmt[4].replace('latitude:','').strip()
 	cmtlon = cmt[5].replace('longitude:','').strip()
 	tshift = float(cmt[2].replace('time shift:','').strip())
+	hdur = float(cmt[3].replace('half duration:','').strip())
 	if debugreadcmt:
 		print cmtline1
 	cmtline1 = cmtline1.split()
@@ -185,13 +186,14 @@ def readcmt(cmt):
 		print 'Day:' + str(eventtime.julday)
 		print 'Hour:' + str(eventtime.hour)
 		print 'Minute:' + str(eventtime.minute)
-	return cmtlat, cmtlon, eventtime, tshift
+	return cmtlat, cmtlon, eventtime, tshift,hdur
 
 def getdata(net,sta,eventtime,lents,dataloc):
 #This function goes to one of the archives and gets the data
-	debuggetdata = False
+	debuggetdata = True
 	preeventday = eventtime - 24*60*60
 	posteventday = eventtime + 24*60*60
+	prepostwin= 3000
 #If II get off of /tr1 else get the data from /xs0 or /xs1
 	if net == 'II':
 		dataprefix = '/tr1/telemetry_days/'
@@ -201,18 +203,19 @@ def getdata(net,sta,eventtime,lents,dataloc):
 		else:
 			dataprefix = 'xs0'
 		dataprefix = '/' + dataprefix + '/seed/'
-	if not dataloc:
-		dataprefix = '/tr1/telemetry_days/'
-	
+#	if not dataloc:
+#		dataprefix = '/tr1/telemetry_days/'
+	if debug:
+		print 'Here is the dataprefix:' + dataprefix
 	st = read(dataprefix + net + '_' + sta + '/' + str(eventtime.year) + \
 	'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '*/*LH*.seed', \
-	starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+	starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
 	st += read(dataprefix + net + '_' + sta + '/' + str(posteventday.year) + \
 	'/' + str(posteventday.year) + '_' + str(posteventday.julday).zfill(3) + '*/*LH*.seed', \
-	starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+	starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
 	st += read(dataprefix + net + '_' + sta + '/' + str(preeventday.year) + \
 	'/' + str(preeventday.year) + '_' + str(preeventday.julday).zfill(3) + '*/*LH*.seed', \
-	starttime=eventtime-3000,endtime=(eventtime+lents+3000))
+	starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
 	st.merge(fill_value='latest')
 	if debuggetdata:
 		print 'We have data'
@@ -287,6 +290,30 @@ def getcolor(chan,loc):
 		color = 'b'
 	return color
 
+#def stfconv(syntrace,hdur):
+	#A function to convolve the source time function with
+#	stf = numpy.zeros(syntrace.stats.npts)
+#	for ind in range(1,syntrace.stats.npts):
+#		if (ind - 2*hdur) <= 0:
+#			stf(ind) = 1
+#	stf = stf*(1/(2*hdur))
+	
+
+
+
+
+
+#	return syntrace
+
+
+
+
+
+
+
+
+
+
 def writestats(statfile,streamin,comp):
 	try:
 		syncomp = "LX" + comp	
@@ -324,7 +351,7 @@ if not os.path.isfile(synfile + '/CMTSOLUTION'):
 	print "No CMT found"
 	exit(0)
 cmt = tuple(open(synfile + '/CMTSOLUTION'))
-cmtlat, cmtlon, eventtime, tshift = readcmt(cmt)
+cmtlat, cmtlon, eventtime, tshift, hdur = readcmt(cmt)
 
 #Lets make a local results directory
 resultdir = sys.argv[2]

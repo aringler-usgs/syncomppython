@@ -196,26 +196,38 @@ def getdata(net,sta,eventtime,lents,dataloc):
 	prepostwin= 3000
 #If II get off of /tr1 else get the data from /xs0 or /xs1
 	if net == 'II':
-		dataprefix = '/tr1/telemetry_days/'
+		dataprefix1 = '/tr1/telemetry_days/'
 	else:
 		if net in set(['IW','NE','US']):	
 			dataprefix = 'xs1'	
 		else:
 			dataprefix = 'xs0'
-		dataprefix = '/' + dataprefix + '/seed/'
+		dataprefix1 = '/' + dataprefix + '/seed/'
 #	if not dataloc:
-#		dataprefix = '/tr1/telemetry_days/'
+		dataprefix2 = '/tr1/telemetry_days/'
 	if debug:
 		print 'Here is the dataprefix:' + dataprefix
-	st = read(dataprefix + net + '_' + sta + '/' + str(eventtime.year) + \
-	'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '*/*LH*.seed', \
-	starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
-	st += read(dataprefix + net + '_' + sta + '/' + str(posteventday.year) + \
-	'/' + str(posteventday.year) + '_' + str(posteventday.julday).zfill(3) + '*/*LH*.seed', \
-	starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
-	st += read(dataprefix + net + '_' + sta + '/' + str(preeventday.year) + \
-	'/' + str(preeventday.year) + '_' + str(preeventday.julday).zfill(3) + '*/*LH*.seed', \
-	starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
+	try:
+		st = read(dataprefix1 + net + '_' + sta + '/' + str(eventtime.year) + \
+		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '*/*LH*.seed', \
+		starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
+		st += read(dataprefix1 + net + '_' + sta + '/' + str(posteventday.year) + \
+		'/' + str(posteventday.year) + '_' + str(posteventday.julday).zfill(3) + '*/*LH*.seed', \
+		starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
+		st += read(dataprefix1 + net + '_' + sta + '/' + str(preeventday.year) + \
+		'/' + str(preeventday.year) + '_' + str(preeventday.julday).zfill(3) + '*/*LH*.seed', \
+		starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
+		
+	except:
+		st = read(dataprefix2 + net + '_' + sta + '/' + str(eventtime.year) + \
+		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '*/*LH*.seed', \
+		starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
+		st += read(dataprefix2 + net + '_' + sta + '/' + str(posteventday.year) + \
+		'/' + str(posteventday.year) + '_' + str(posteventday.julday).zfill(3) + '*/*LH*.seed', \
+		starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
+		st += read(dataprefix2 + net + '_' + sta + '/' + str(preeventday.year) + \
+		'/' + str(preeventday.year) + '_' + str(preeventday.julday).zfill(3) + '*/*LH*.seed', \
+		starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
 	st.merge(fill_value='latest')
 	if debuggetdata:
 		print 'We have data'
@@ -406,12 +418,12 @@ for sta in stations:
 #Here is where I am mucking around		
 		paz=getPAZ2(sp,net,cursta,trace.stats.location,trace.stats.channel,eventtime)
 		try:
-			trace.taper(type='cosine')
+			trace.taper(max_percentage=0.05, type='cosine')
 			trace.simulate(paz_remove=paz)
 #Here we filter
 			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
 			trace.integrate()
-			trace.taper(type='cosine')
+			trace.taper(max_percentage=0.05, type='cosine')
 			trace.trim(starttime=eventtime + tshift/2,endtime=(eventtime+lents + tshift/2))
 			trace.detrend()
 			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
@@ -460,13 +472,13 @@ for sta in stations:
 		curtrace = read(cursyn)
 		curtrace[0].data = curtrace[0].data/(10**9)
 		curtrace[0].stats.starttime = curtrace[0].stats.starttime + tshift/2
-		curtrace.taper(type='cosine')
+		curtrace.taper(max_percentage=0.05, type='cosine')
 #		pazfake= {'poles': [1-1j], 'zeros': [1-1j], 'gain':1,'sensitivity': 1}
 #		curtrace.simulate(paz_remove=pazfake, paz_simulate=pazfake)
 		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
 		curtrace.integrate()
 		curtrace.integrate()
-		curtrace.taper(type='cosine')
+		curtrace.taper(max_percentage=0.05, type='cosine')
 		curtrace.detrend()
 		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
 		curtrace[0].stats.channel=(curtrace[0].stats.channel).replace('LH','LX')

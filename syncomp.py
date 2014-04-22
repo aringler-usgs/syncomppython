@@ -14,6 +14,7 @@ from obspy.xseed import Parser
 from time import gmtime, strftime
 from obspy.core.util.geodetics import gps2DistAzimuth
 from obspy.signal.cross_correlation import xcorr
+from obspy.core.util.version  import read_release_version
 
 
 debug=False
@@ -25,6 +26,13 @@ usermaxfre = .01
 lents = 4000
 #Use half the value you think you want e.g. 2 gives you a total of 4 poles
 filtercornerpoles = 2
+
+newVer = False
+ver = (read_release_version()).split('-')[0]
+ver = ver.split('.')
+if int(ver[1]) > 8:
+	print 'Using new taper flag'
+	newVer = True
 
 manstalist=False
 stations=['IC BJT']
@@ -418,12 +426,18 @@ for sta in stations:
 #Here is where I am mucking around		
 		paz=getPAZ2(sp,net,cursta,trace.stats.location,trace.stats.channel,eventtime)
 		try:
-			trace.taper(max_percentage=0.05, type='cosine')
+			if newVer:
+				trace.taper(max_percentage=0.05, type='cosine')
+			else:
+				trace.taper()
 			trace.simulate(paz_remove=paz)
 #Here we filter
 			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
 			trace.integrate()
-			trace.taper(max_percentage=0.05, type='cosine')
+			if newVer:
+				trace.taper(max_percentage=0.05, type='cosine')
+			else:
+				trace.taper()
 			trace.trim(starttime=eventtime + tshift/2,endtime=(eventtime+lents + tshift/2))
 			trace.detrend()
 			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
@@ -472,13 +486,19 @@ for sta in stations:
 		curtrace = read(cursyn)
 		curtrace[0].data = curtrace[0].data/(10**9)
 		curtrace[0].stats.starttime = curtrace[0].stats.starttime + tshift/2
-		curtrace.taper(max_percentage=0.05, type='cosine')
+		if newVer:
+			curtrace.taper(max_percentage=0.05, type='cosine')
+		else:
+			curtrace.taper()
 #		pazfake= {'poles': [1-1j], 'zeros': [1-1j], 'gain':1,'sensitivity': 1}
 #		curtrace.simulate(paz_remove=pazfake, paz_simulate=pazfake)
 		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
 		curtrace.integrate()
 		curtrace.integrate()
-		curtrace.taper(max_percentage=0.05, type='cosine')
+		if newVer:
+			curtrace.taper(max_percentage=0.05, type='cosine')
+		else:
+			curtrace.taper()
 		curtrace.detrend()
 		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
 		curtrace[0].stats.channel=(curtrace[0].stats.channel).replace('LH','LX')

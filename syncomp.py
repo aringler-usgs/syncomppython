@@ -27,12 +27,12 @@ lents = 4000
 #Use half the value you think you want e.g. 2 gives you a total of 4 poles
 filtercornerpoles = 2
 
-newVer = False
-ver = (read_release_version()).split('-')[0]
-ver = ver.split('.')
-if int(ver[1]) > 8:
-	print 'Using new taper flag'
-	newVer = True
+newVer = True
+#ver = (read_release_version()).split('-')[0]
+#ver = ver.split('.')
+#if int(ver[1]) > 8:
+#	print 'Using new taper flag'
+#	newVer = True
 
 manstalist=False
 stations=['IC BJT']

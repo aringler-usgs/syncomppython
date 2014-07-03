@@ -27,15 +27,9 @@ lents = 4000
 #Use half the value you think you want e.g. 2 gives you a total of 4 poles
 filtercornerpoles = 2
 
-newVer = True
-#ver = (read_release_version()).split('-')[0]
-#ver = ver.split('.')
-#if int(ver[1]) > 8:
-#	print 'Using new taper flag'
-#	newVer = True
 
-manstalist=False
-stations=['IC BJT']
+manstalist=True
+stations=['IU TUC']
 
 def getorientation(net,sta,loc,chan,evetime,xseedval):
 #A function to get the orientation of a station at a specific time
@@ -198,7 +192,7 @@ def readcmt(cmt):
 
 def getdata(net,sta,eventtime,lents,dataloc):
 #This function goes to one of the archives and gets the data
-	debuggetdata = True
+	debuggetdata = False
 	preeventday = eventtime - 24*60*60
 	posteventday = eventtime + 24*60*60
 	prepostwin= 3000
@@ -211,10 +205,9 @@ def getdata(net,sta,eventtime,lents,dataloc):
 		else:
 			dataprefix = 'xs0'
 		dataprefix1 = '/' + dataprefix + '/seed/'
-#	if not dataloc:
 		dataprefix2 = '/tr1/telemetry_days/'
-	if debug:
-		print 'Here is the dataprefix:' + dataprefix
+	if debuggetdata:
+		print 'Here is the dataprefix:' + dataprefix1
 	try:
 		st = read(dataprefix1 + net + '_' + sta + '/' + str(eventtime.year) + \
 		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '*/*LH*.seed', \
@@ -280,20 +273,40 @@ def getPAZ2(sp,net,sta,loc,chan,eventtime):
 					data['seismometer_gain'] = blockette.sensitivity_gain
 				elif blockette.stage_sequence_number == 2:
 					data['digitizer_gain'] = blockette.sensitivity_gain
+				elif blockette.stage_sequence_number == 3:
+					if not 'digitizer_gain' in data.keys():
+						data['digitizer_gain'] = blockette.sensitivity_gain
+					else:
+						data['digitizer_gain'] *= blockette.sensitivity_gain
 			elif blockette.id == 53 and channel_flag and station_flag:
-				data['gain'] = blockette.A0_normalization_factor
-				data['poles'] = []
-				if not blockette.transfer_function_types == 'A':
+				if not 'gain' in data.keys():
+					data['gain'] = blockette.A0_normalization_factor
+				else:
+					data['gain'] *= blockette.A0_normalization_factor
+				if debuggetPAZ2:
+					print 'Here is the gain: ' + str(blockette.A0_normalization_factor)
+				if not 'poles' in data.keys():
+					data['poles'] = []
+				if not blockette.transfer_function_types in set(['A','B']):
 					msg = 'Only supporting Laplace transform response ' + \
 					'type. Skipping other response information.'
 					warnings.warn(msg, UserWarning)
 					continue
+				
+				if blockette.transfer_function_types == 'B':
+					schan = 1
+				else:
+					schan = 1
+				if debuggetPAZ2:
+					print 'Here are the number of poles:' + str(blockette.number_of_complex_poles)
+					print 'Here are the number of zeros:' + str(blockette.number_of_complex_zeros)
 				for i in range(blockette.number_of_complex_poles):
-					p = complex(blockette.real_pole[i], blockette.imaginary_pole[i])
+					p = complex(schan*blockette.real_pole[i], schan*blockette.imaginary_pole[i])
 					data['poles'].append(p)
-				data['zeros'] = []
+				if not 'zeros' in data.keys():
+					data['zeros'] = []
 				for i in range(blockette.number_of_complex_zeros):
-					z = complex(blockette.real_zero[i], blockette.imaginary_zero[i])
+					z = complex(schan*blockette.real_zero[i], schan*blockette.imaginary_zero[i])
 					data['zeros'].append(z)
         return data
 
@@ -306,32 +319,15 @@ def getcolor(chan,loc):
 		color = 'r'
 	elif loc == '60':
 		color = 'c'
+	elif loc == '30':
+		color = '0.75'
+	elif loc == '40':
+		color = 'y'
+	elif loc == '50':
+		color = 'm'
 	else:
 		color = 'b'
 	return color
-
-#def stfconv(syntrace,hdur):
-	#A function to convolve the source time function with
-#	stf = numpy.zeros(syntrace.stats.npts)
-#	for ind in range(1,syntrace.stats.npts):
-#		if (ind - 2*hdur) <= 0:
-#			stf(ind) = 1
-#	stf = stf*(1/(2*hdur))
-	
-
-
-
-
-
-#	return syntrace
-
-
-
-
-
-
-
-
 
 
 def writestats(statfile,streamin,comp):
@@ -351,9 +347,6 @@ def writestats(statfile,streamin,comp):
 		if debug:
 			print 'No residual for' + cursta + ' ' + 'LH' + comp	
 	return
-
-
-
 
 #Start of the main part of the program
 if not len(sys.argv) == 4:
@@ -414,30 +407,30 @@ for sta in stations:
 	cursta = sta.split()
 	net = cursta[0]
 	cursta = cursta[1]
-	try:
+	#try:
+	if True:
 		st = getdata(net,cursta,eventtime,lents,dataloc)
-	except:
-		print('No data for ' + net + ' ' + cursta)
-		continue
+	#except:
+	#	print('No data for ' + net + ' ' + cursta)
+	#	continue
 		
 #Lets go through each trace in the stream and deconvolve and filter
 	for trace in st:
 #Here we get the response and remove it
 #Here is where I am mucking around		
 		paz=getPAZ2(sp,net,cursta,trace.stats.location,trace.stats.channel,eventtime)
+		if debug:
+			print 'Here is the paz'
+			print(paz)		
 		try:
-			if newVer:
-				trace.taper(max_percentage=0.05, type='cosine')
-			else:
-				trace.taper()
+			
+			trace.taper(max_percentage=0.05, type='cosine')
 			trace.simulate(paz_remove=paz)
 #Here we filter
 			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
 			trace.integrate()
-			if newVer:
-				trace.taper(max_percentage=0.05, type='cosine')
-			else:
-				trace.taper()
+			trace.taper(max_percentage=0.05, type='cosine')
+
 			trace.trim(starttime=eventtime + tshift/2,endtime=(eventtime+lents + tshift/2))
 			trace.detrend()
 			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
@@ -486,19 +479,17 @@ for sta in stations:
 		curtrace = read(cursyn)
 		curtrace[0].data = curtrace[0].data/(10**9)
 		curtrace[0].stats.starttime = curtrace[0].stats.starttime + tshift/2
-		if newVer:
-			curtrace.taper(max_percentage=0.05, type='cosine')
-		else:
-			curtrace.taper()
+
+		curtrace.taper(max_percentage=0.05, type='cosine')
+
 #		pazfake= {'poles': [1-1j], 'zeros': [1-1j], 'gain':1,'sensitivity': 1}
 #		curtrace.simulate(paz_remove=pazfake, paz_simulate=pazfake)
 		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
 		curtrace.integrate()
 		curtrace.integrate()
-		if newVer:
-			curtrace.taper(max_percentage=0.05, type='cosine')
-		else:
-			curtrace.taper()
+		
+		curtrace.taper(max_percentage=0.05, type='cosine')
+
 		curtrace.detrend()
 		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
 		curtrace[0].stats.channel=(curtrace[0].stats.channel).replace('LH','LX')

@@ -19,17 +19,26 @@ usage: syncomp.py [-h] -n NETWORK -resDir RESDIR -syn SYN [SYN ...] [-sta STA]
 Program to compare long-period event synthetics to data
 
 optional arguments:
+
   -h, --help            show this help message and exit
+
   -n NETWORK            Network name Example: IU
+
   -resDir RESDIR        Result directory name Example: blah
+
   -syn SYN [SYN ...]    Synthetics directory location Example:
                         /SYNTHETICS/2014/C201401*
+
   -sta STA              Stations to use Example with a comma (,) separator :
                         TUC,ANMO
+
   -tslen LENTS          Length of time series in seconds Example: 4000,
                         default is 4000 s
+
   -debug                Run in debug mode
+
   -dataloc              Use /xs0 data location, otherwise use /tr1 also
+
   -filter FILTER FILTER FILTER
                         Filter parameters using minimum period maximum period
                         and number of corners Example: 100 200 4, default is

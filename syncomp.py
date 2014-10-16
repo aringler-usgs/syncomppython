@@ -7,6 +7,7 @@ import numpy
 import matplotlib
 import math
 import warnings
+import argparse
 from matplotlib.pyplot import (figure,axes,plot,xlabel,ylabel,title,subplot,legend,savefig,show)
 from obspy import read, Stream
 from obspy.core import UTCDateTime
@@ -17,19 +18,8 @@ from obspy.signal.cross_correlation import xcorr
 from obspy.core.util.version  import read_release_version
 
 
-debug=False
 datalessloc = '/APPS/metadata/SEED/'
-#Here is the data location use True for xs0 otherwise use false
-dataloc = False
-userminfre = .0025
-usermaxfre = .01
-lents = 4000
-#Use half the value you think you want e.g. 2 gives you a total of 4 poles
-filtercornerpoles = 2
 
-
-manstalist=True
-stations=['IU TUC']
 
 def getorientation(net,sta,loc,chan,evetime,xseedval):
 #A function to get the orientation of a station at a specific time
@@ -155,7 +145,7 @@ def getstalist(sp,etime,curnet):
 #Pull the station info for blockette 50
 				stacall = blkt.station_call_letters.strip()
 				if debug:
-					print "Here is a station in the dataless" + stacall
+					print "Here is a station in the dataless: " + stacall
 				if type(blkt.end_effective_date) is str:
 					curdoy = strftime("%j",gmtime())
 					curyear = strftime("%Y",gmtime())
@@ -170,8 +160,8 @@ def getstalist(sp,etime,curnet):
 
 def readcmt(cmt):
 	debugreadcmt = False
-#Now we can continue like there is no difference between Princeton and our Synthetics
-#Lets get the event time from the cmt
+	#Now we can continue like there is no difference between Princeton and our Synthetics
+	#Lets get the event time from the cmt
 	cmtline1 = ' '.join(cmt[0].split())
 	cmtlat = cmt[4].replace('latitude:','').strip()
 	cmtlon = cmt[5].replace('longitude:','').strip()
@@ -181,8 +171,10 @@ def readcmt(cmt):
 		print cmtline1
 	cmtline1 = cmtline1.split()
 	if debugreadcmt:
-		print cmtline1[1] + ' ' + cmtline1[2] + ' ' + cmtline1[3] + ' ' + cmtline1[4] + ' ' + cmtline1[5] + ' ' + cmtline1[6]
-	eventtime = UTCDateTime(int(cmtline1[1]),int(cmtline1[2]),int(cmtline1[3]),int(cmtline1[4]),int(cmtline1[5]),float(cmtline1[6]))
+		print cmtline1[1] + ' ' + cmtline1[2] + ' ' + cmtline1[3] + ' ' + cmtline1[4] + ' ' + \
+			cmtline1[5] + ' ' + cmtline1[6]
+	eventtime = UTCDateTime(int(cmtline1[1]),int(cmtline1[2]),int(cmtline1[3]),int(cmtline1[4]),\
+		int(cmtline1[5]),float(cmtline1[6]))
 	if debugreadcmt:
 		print 'Year:' + str(eventtime.year)
 		print 'Day:' + str(eventtime.julday)
@@ -348,241 +340,307 @@ def writestats(statfile,streamin,comp):
 			print 'No residual for' + cursta + ' ' + 'LH' + comp	
 	return
 
+
+def getargs():
+
+	parser = argparse.ArgumentParser(description = "Program to compare long-period event synthetics to data")
+
+	parser.add_argument('-n', type = str, action = "store", \
+		dest = "network", required = True, help = "Network name Example: IU")
+
+	parser.add_argument('-resDir',type = str, action = "store", \
+		dest = "resDir", required = True, help = "Result directory name Example: blah")
+
+	parser.add_argument('-syn', type = str, action = "store", \
+		dest = "syn", required = True, nargs = "+", help = "Synthetics directory location Example: " + \
+		"/SYNTHETICS/2014/C201401*")
+
+	parser.add_argument('-sta', type = str, action = "store", \
+		dest = "sta", required = False, help = "Stations to use Example with a comma (,) separator : TUC,ANMO")
+
+	parser.add_argument('-tslen', type = int, action ="store", \
+		dest = "lents", required = False, help = "Length of time series in seconds Example:  4000, default is 4000 s")
+
+	parser.add_argument('-debug', action = "store_true", dest = "debug", \
+		default = False, help = "Run in debug mode")
+
+	parser.add_argument('-dataloc', action = "store_true", dest = "dataloc", \
+		default = False, help = "Use /xs0 data location, otherwise use /tr1 also")
+
+	parser.add_argument('-filter', action = "store", nargs = 3, dest = "filter", required = False, \
+		help = "Filter parameters using minimum period maximum period and number of corners Example: 100 200 4, " + \
+			"default is 100 400 2")
+
+	parserval = parser.parse_args()
+	return parserval
+
+
+
+
 #Start of the main part of the program
-if not len(sys.argv) == 4:
-	print "Usage: Syntheticlocation ResultsName Network"
-	exit(0)
- 
-synfile = sys.argv[1]
-if synfile[-1] == '/':
-	synfile = synfile[:-1]
+if __name__ == "__main__":
 
-#Read in the CMT solution 
-if debug:
-	print "We are using local synthetics"
-if not os.path.isfile(synfile + '/CMTSOLUTION'):
-	print "No CMT found"
-	exit(0)
-cmt = tuple(open(synfile + '/CMTSOLUTION'))
-cmtlat, cmtlon, eventtime, tshift, hdur = readcmt(cmt)
+	#Lets get the parser arguments
+	parserval = getargs()
 
-#Lets make a local results directory
-resultdir = sys.argv[2]
-if resultdir[-1] == '/':
-	resultdir = resultdir[:-1]
+	debug = parserval.debug
 
-if not os.path.exists(os.getcwd() + '/' + resultdir):
-	os.mkdir(os.getcwd() + '/' + resultdir)
-evename = synfile.split("/")
-evename = evename[len(evename)-1]
-
-curnet = sys.argv[3]
-
-statfile = open(os.getcwd() + '/' + resultdir + '/Results' + evename + curnet + '.csv' ,'w')
-statfile.write('net,sta,loc,chan,scalefac,lag,corr\n')
-
-
-
-
-#Lets read in the dataless
-try:
-	sp = Parser(datalessloc + curnet + ".dataless")
-except:
-	print "Can not read the dataless."
-	exit(0)
-if not manstalist:
-	stations = getstalist(sp,eventtime,curnet)
-
-if debug:
-	print "Here are the stations we found"	
-	for sta in stations:
-		print "Here is a station:" + sta
-
-
-#Lets start by using a station list and then move to a different approach
-for sta in stations:
-	cursta = sta.strip()
-	if debug:
-		print 'Current station:' + cursta
-	cursta = sta.split()
-	net = cursta[0]
-	cursta = cursta[1]
-	#try:
-	if True:
-		st = getdata(net,cursta,eventtime,lents,dataloc)
-	#except:
-	#	print('No data for ' + net + ' ' + cursta)
-	#	continue
-		
-#Lets go through each trace in the stream and deconvolve and filter
-	for trace in st:
-#Here we get the response and remove it
-#Here is where I am mucking around		
-		paz=getPAZ2(sp,net,cursta,trace.stats.location,trace.stats.channel,eventtime)
+	if parserval.sta:
+		manstalist = True
+		if debug: 
+			print "We are using a manual station list"
+		stalist = parserval.sta.split(",")
+		stations = []
+		for sta in stalist:
+			stations.append(parserval.network + " " + sta)
 		if debug:
-			print 'Here is the paz'
-			print(paz)		
+			print(stations) 
+	else:
+		manstalist = False
+
+	if parserval.lents:
+		lents = parserval.lents
+	else:
+		lents = 4000
+
+	if parserval.filter:
+		userminfre = 1.0/float(parserval.filter[1])
+		usermaxfre = 1.0/float(parserval.filter[0])
+		filtercornerpoles = int(parserval.filter[2])
+	else:
+		userminfre = 0.0025
+		usermaxfre = 0.01
+		filtercornerpoles = 2
+
+	if parserval.dataloc:
+		dataloc = True
+	else:
+		dataloc = False
+
+	for synfile in parserval.syn:
+	 
+
+		if synfile[-1] == '/':
+			synfile = synfile[:-1]
+
+	
+		#Read in the CMT solution 
+		if debug:
+			print "We are using local synthetics"
+		if not os.path.isfile(synfile + '/CMTSOLUTION'):
+			print "No CMT found"
+			exit(0)
+		cmt = tuple(open(synfile + '/CMTSOLUTION'))
+		cmtlat, cmtlon, eventtime, tshift, hdur = readcmt(cmt)
+
+		#Lets make a local results directory
+		resultdir = parserval.resDir
+		if resultdir[-1] == '/':
+			resultdir = resultdir[:-1]
+
+		if not os.path.exists(os.getcwd() + '/' + resultdir):
+			os.mkdir(os.getcwd() + '/' + resultdir)
+		evename = synfile.split("/")
+		evename = evename[len(evename)-1]
+
+		curnet = parserval.network
+
+		statfile = open(os.getcwd() + '/' + resultdir + '/Results' + evename + curnet + '.csv' ,'w')
+		statfile.write('net,sta,loc,chan,scalefac,lag,corr\n')
+
+		#Lets read in the dataless
 		try:
-			
-			trace.taper(max_percentage=0.05, type='cosine')
-			trace.simulate(paz_remove=paz)
-#Here we filter
-			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
-			trace.integrate()
-			trace.taper(max_percentage=0.05, type='cosine')
-
-			trace.trim(starttime=eventtime + tshift/2,endtime=(eventtime+lents + tshift/2))
-			trace.detrend()
-			trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
+			sp = Parser(datalessloc + curnet + ".dataless")
 		except:
-			print('Can not find the response')
-			st.remove(trace)
+			print "Can not read the dataless."
+			exit(0)
+		if not manstalist:
+			stations = getstalist(sp,eventtime,curnet)
 
-#Lets check for reverse polarity and fix 
-	finalstream=Stream()
-	for trace in st.select(component="Z"):
-		dipval = getdip(net,cursta,trace.stats.location,trace.stats.channel,eventtime,sp)
 		if debug:
-			print 'Here is the dip value:' + str(dipval)
-		if dipval == 90.0:
-			trace.data = -trace.data
-		finalstream += trace
-		st.remove(trace)
+			print "Here are the stations we found"	
+			for sta in stations:
+				print "Here is a station:" + sta
 
-#Now we rotate the horizontals to E and W
-	locations=[]
-	for trace in st:
-		locations.append(trace.stats.location)
-	locations=set(locations)
 
-	for curloc in locations:
-		curlochorizontal = st.select(location=curloc)
-		curlochorizontal.sort(['channel'])
-		if debug:
-			print "Here are the number of traces:" + str(len(curlochorizontal)) + " which should be 2"
-			print(curlochorizontal)
-		azi=getorientation(net,cursta,curloc,curlochorizontal[0].stats.channel,eventtime,sp)
-		if debug:
-			print "Here is the azimuth" + str(azi)
-		curlochorizontal = choptocommon(curlochorizontal)
-		finalstream += rotatehorizontal(curlochorizontal,azi)	
+		#Lets start by using a station list and then move to a different approach
+		for sta in stations:
+			cursta = sta.strip()
+			if debug:
+				print 'Current station:' + cursta
+			cursta = sta.split()
+			net = cursta[0]
+			cursta = cursta[1]
+		
+			st = getdata(net,cursta,eventtime,lents,dataloc)
+		
+		
+			#Lets go through each trace in the stream and deconvolve and filter
+			for trace in st:
+				#Here we get the response and remove it
+				#Here is where I am mucking around		
+				paz=getPAZ2(sp,net,cursta,trace.stats.location,trace.stats.channel,eventtime)
+				if debug:
+					print 'Here is the paz'
+					print(paz)		
+				try:
 			
-	if debug:
-		print(finalstream)
+					trace.taper(max_percentage=0.05, type='cosine')
+					trace.simulate(paz_remove=paz)
+					#Here we filter
+					trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
+					trace.integrate()
+					trace.taper(max_percentage=0.05, type='cosine')
 
-#We now have rotated data and filtered data so it is time to read in the synthetics and process them
-	syns = glob.glob(synfile + '/' + cursta + '.*.LX*.modes.sac*')
-	synstream = Stream()
-	for cursyn in syns:
-		if debug:
-			print(cursyn)
-		curtrace = read(cursyn)
-		curtrace[0].data = curtrace[0].data/(10**9)
-		curtrace[0].stats.starttime = curtrace[0].stats.starttime + tshift/2
+					trace.trim(starttime=eventtime + tshift/2,endtime=(eventtime+lents + tshift/2))
+					trace.detrend()
+					trace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
+				except:
+					print('Can not find the response')
+					st.remove(trace)
 
-		curtrace.taper(max_percentage=0.05, type='cosine')
+			#Lets check for reverse polarity and fix 
+			finalstream=Stream()
+			for trace in st.select(component="Z"):
+				dipval = getdip(net,cursta,trace.stats.location,trace.stats.channel,eventtime,sp)
+				if debug:
+					print 'Here is the dip value:' + str(dipval)
+				if dipval == 90.0:
+					trace.data = -trace.data
+				finalstream += trace
+				st.remove(trace)
 
-#		pazfake= {'poles': [1-1j], 'zeros': [1-1j], 'gain':1,'sensitivity': 1}
-#		curtrace.simulate(paz_remove=pazfake, paz_simulate=pazfake)
-		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
-		curtrace.integrate()
-		curtrace.integrate()
-		
-		curtrace.taper(max_percentage=0.05, type='cosine')
+			#Now we rotate the horizontals to E and W
+			locations=[]
+			for trace in st:
+				locations.append(trace.stats.location)
+			locations=set(locations)
 
-		curtrace.detrend()
-		curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
-		curtrace[0].stats.channel=(curtrace[0].stats.channel).replace('LH','LX')
-		synstream += curtrace
+			for curloc in locations:
+				curlochorizontal = st.select(location=curloc)
+				curlochorizontal.sort(['channel'])
+				if debug:
+					print "Here are the number of traces:" + str(len(curlochorizontal)) + \
+						" which should be 2"
+					print(curlochorizontal)
+				azi=getorientation(net,cursta,curloc,curlochorizontal[0].stats.channel,eventtime,sp)
+				if debug:
+					print "Here is the azimuth" + str(azi)
+				curlochorizontal = choptocommon(curlochorizontal)
+				finalstream += rotatehorizontal(curlochorizontal,azi)	
 			
-	if debug:
-		print(synstream)
+			if debug:
+				print(finalstream)
 
-#We now need to plot everything and save it
-#Lets plot the verticals first
-	vertcomps = finalstream.select(component="Z")
-	vertcomps += synstream.select(component="Z")
-	vertcomps = choptocommon(vertcomps)
-	if debug:
-		print 'Here are the chopped components'
-		print(vertcomps)
+		#We now have rotated data and filtered data so it is time to read in the synthetics and process them
+			syns = glob.glob(synfile + '/' + cursta + '.*.LX*.modes.sac')
+			synstream = Stream()
+			for cursyn in syns:
+				if debug:
+					print(cursyn)
+				curtrace = read(cursyn)
+				curtrace[0].data = curtrace[0].data/(10**9)
+				curtrace[0].stats.starttime = curtrace[0].stats.starttime + tshift/2
+
+				curtrace.taper(max_percentage=0.05, type='cosine')
+
+		#		pazfake= {'poles': [1-1j], 'zeros': [1-1j], 'gain':1,'sensitivity': 1}
+		#		curtrace.simulate(paz_remove=pazfake, paz_simulate=pazfake)
+				curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
+				curtrace.integrate()
+				curtrace.integrate()
 		
-#Set the time series
-	tz=numpy.arange(0,vertcomps[0].stats.npts / vertcomps[0].stats.sampling_rate, vertcomps[0].stats.delta)
-#Get a legend and plot the vertical
-	synplot = figure(1)
-	subplot(311)
-	titlelegend = vertcomps[0].stats.network + ' ' + vertcomps[0].stats.station + ' '
-	stime = str(vertcomps[0].stats.starttime.year) + ' ' + str(vertcomps[0].stats.starttime.julday) + ' ' + \
-	str(vertcomps[0].stats.starttime.hour) + ':' + str(vertcomps[0].stats.starttime.minute) + \
-	':' + str("{0:.2f}".format(vertcomps[0].stats.starttime.second))
-	titlelegend = titlelegend + stime + ' ' 
-	lat,lon = getlatlon(cursta,eventtime,sp)
-	if debug:
-		print "Latitude:" + str(lat)
-		print "Longitude:" + str(lon)	
-		print "CMT Latitude:" + str(cmtlat)
-		print "CMT Longitude:" + str(cmtlon)
-	dist= gps2DistAzimuth(float(cmtlat),float(cmtlon),lat,lon)
-	bazi ="{0:.1f}".format(dist[2])
-	dist ="{0:.1f}".format( 0.0089932 * dist[0] / 1000)
-	
-	titlelegend = titlelegend + 'Dist:' + str(dist) 
-	titlelegend = titlelegend + ' BAzi:' + str(bazi) 
-	minper = "{0:.0f}".format(1/usermaxfre)
-	maxper = "{0:.0f}".format(1/userminfre)
-	titlelegend = titlelegend + ' ' + str(minper) + '-' + str(maxper) + ' s per.'
-	title(titlelegend,fontsize=12)
-	vertcomps.sort(['location'])
-	for comps in vertcomps.select(component="Z"):
-		curcolor = getcolor(comps.stats.channel,comps.stats.location)
-		plot(tz,(comps.data*(10**3)), curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
-	legend(prop={'size':6})
+				curtrace.taper(max_percentage=0.05, type='cosine')
 
+				curtrace.detrend()
+				curtrace.filter("bandpass",freqmin = userminfre,freqmax= usermaxfre, corners=filtercornerpoles)
+				curtrace[0].stats.channel=(curtrace[0].stats.channel).replace('LH','LX')
+				synstream += curtrace
+			
+			if debug:
+				print(synstream)
 
-	finalstream += synstream
-	finalstream = choptocommon(finalstream)
-	finalstream.sort(['location','channel'])
-	if debug:
-		print "Here is the final stream:"
-		print(finalstream)
-	subplot(312)
-	tne=numpy.arange(0,finalstream[0].stats.npts / finalstream[0].stats.sampling_rate, finalstream[0].stats.delta)
-	for comps in finalstream.select(component="N"):
-		curcolor = getcolor(comps.stats.channel,comps.stats.location)
+			#We now need to plot everything and save it
+			#Lets plot the verticals first
+			vertcomps = finalstream.select(component="Z")
+			vertcomps += synstream.select(component="Z")
+			vertcomps = choptocommon(vertcomps)
+			if debug:
+				print 'Here are the chopped components'
+				print(vertcomps)
 		
-		plot(tne,(comps.data*(10**3)),curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
-	legend(prop={'size':6})
-	ylabel('Displacement (mm)')	
-	subplot(313)
-	for comps in finalstream.select(component="E"):
-		curcolor = getcolor(comps.stats.channel,comps.stats.location)
-		plot(tne,(comps.data*(10**3)),curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
-	legend(prop={'size':6})
-	xlabel('Time (s)')
-	savefig(os.getcwd() + '/' + resultdir + '/' + cursta + \
-	str(vertcomps[0].stats.starttime.year) + str(vertcomps[0].stats.starttime.julday) + \
-	str(vertcomps[0].stats.starttime.hour) + str(vertcomps[0].stats.starttime.minute) + '.jpg', format = 'jpeg', dpi=400)
+			#Set the time series
+			tz=numpy.arange(0,vertcomps[0].stats.npts / vertcomps[0].stats.sampling_rate, vertcomps[0].stats.delta)
+			#Get a legend and plot the vertical
+			synplot = figure(1)
+			subplot(311)
+			titlelegend = vertcomps[0].stats.network + ' ' + vertcomps[0].stats.station + ' '
+			stime = str(vertcomps[0].stats.starttime.year) + ' ' + str(vertcomps[0].stats.starttime.julday) + ' ' + \
+			str(vertcomps[0].stats.starttime.hour) + ':' + str(vertcomps[0].stats.starttime.minute) + \
+			':' + str("{0:.2f}".format(vertcomps[0].stats.starttime.second))
+			titlelegend = titlelegend + stime + ' ' 
+			lat,lon = getlatlon(cursta,eventtime,sp)
+			if debug:
+				print "Latitude:" + str(lat)
+				print "Longitude:" + str(lon)	
+				print "CMT Latitude:" + str(cmtlat)
+				print "CMT Longitude:" + str(cmtlon)
+			dist= gps2DistAzimuth(float(cmtlat),float(cmtlon),lat,lon)
+			bazi ="{0:.1f}".format(dist[2])
+			dist ="{0:.1f}".format( 0.0089932 * dist[0] / 1000)
+	
+			titlelegend = titlelegend + 'Dist:' + str(dist) 
+			titlelegend = titlelegend + ' BAzi:' + str(bazi) 
+			minper = "{0:.0f}".format(1/usermaxfre)
+			maxper = "{0:.0f}".format(1/userminfre)
+			titlelegend = titlelegend + ' ' + str(minper) + '-' + str(maxper) + ' s per.'
+			title(titlelegend,fontsize=12)
+			vertcomps.sort(['location'])
+			for comps in vertcomps.select(component="Z"):
+				curcolor = getcolor(comps.stats.channel,comps.stats.location)
+				plot(tz,(comps.data*(10**3)), curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
+			legend(prop={'size':6})
 
-	synplot.clear()
 
-#Time to write some info into the statfile
-#Write the network and the station
-	#statfile.write(net + "," + cursta + "," + str(dist) + "," + str(bazi))
-	writestats(statfile,vertcomps,'Z')
-	writestats(statfile,finalstream,'N')
-	writestats(statfile,finalstream,'E')
+			finalstream += synstream
+			finalstream = choptocommon(finalstream)
+			finalstream.sort(['location','channel'])
+			if debug:
+				print "Here is the final stream:"
+				print(finalstream)
+			subplot(312)
+			tne=numpy.arange(0,finalstream[0].stats.npts / finalstream[0].stats.sampling_rate, finalstream[0].stats.delta)
+			for comps in finalstream.select(component="N"):
+				curcolor = getcolor(comps.stats.channel,comps.stats.location)
+		
+				plot(tne,(comps.data*(10**3)),curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
+			legend(prop={'size':6})
+			ylabel('Displacement (mm)')	
+			subplot(313)
+			for comps in finalstream.select(component="E"):
+				curcolor = getcolor(comps.stats.channel,comps.stats.location)
+				plot(tne,(comps.data*(10**3)),curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
+			legend(prop={'size':6})
+			xlabel('Time (s)')
+			savefig(os.getcwd() + '/' + resultdir + '/' + cursta + \
+			str(vertcomps[0].stats.starttime.year) + str(vertcomps[0].stats.starttime.julday) + \
+			str(vertcomps[0].stats.starttime.hour) + str(vertcomps[0].stats.starttime.minute) + '.jpg', format = 'jpeg', dpi=400)
+
+			synplot.clear()
+
+			#Time to write some info into the statfile
+			#Write the network and the station
+			#statfile.write(net + "," + cursta + "," + str(dist) + "," + str(bazi))
+			writestats(statfile,vertcomps,'Z')
+			writestats(statfile,finalstream,'N')
+			writestats(statfile,finalstream,'E')
 	
 	
-#Lets get an RMS from the synthetic and the data
+		#Lets get an RMS from the synthetic and the data
 	
 
 
 
 
 
-
-
-
-
-statfile.close()
+		statfile.close()

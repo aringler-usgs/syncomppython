@@ -191,6 +191,7 @@ def getdata(net,sta,eventtime,lents,dataloc):
 #If II get off of /tr1 else get the data from /xs0 or /xs1
 	if net == 'II':
 		dataprefix1 = '/tr1/telemetry_days/'
+		dataperfix = [dataprefix1]
 	else:
 		if net in set(['IW','NE','US']):	
 			dataprefix = 'xs1'	
@@ -198,29 +199,28 @@ def getdata(net,sta,eventtime,lents,dataloc):
 			dataprefix = 'xs0'
 		dataprefix1 = '/' + dataprefix + '/seed/'
 		dataprefix2 = '/tr1/telemetry_days/'
+		if dataloc:
+			dataprefix = [dataprefix1]
+		else:
+			dataprefix = [dataprefix1, dataprefix2]
 	if debuggetdata:
 		print 'Here is the dataprefix:' + dataprefix1
-	try:
-		st = read(dataprefix1 + net + '_' + sta + '/' + str(eventtime.year) + \
-		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '*/*LH*.seed', \
-		starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
-		st += read(dataprefix1 + net + '_' + sta + '/' + str(posteventday.year) + \
-		'/' + str(posteventday.year) + '_' + str(posteventday.julday).zfill(3) + '*/*LH*.seed', \
-		starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
-		st += read(dataprefix1 + net + '_' + sta + '/' + str(preeventday.year) + \
-		'/' + str(preeventday.year) + '_' + str(preeventday.julday).zfill(3) + '*/*LH*.seed', \
-		starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
-		
-	except:
-		st = read(dataprefix2 + net + '_' + sta + '/' + str(eventtime.year) + \
-		'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '*/*LH*.seed', \
-		starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
-		st += read(dataprefix2 + net + '_' + sta + '/' + str(posteventday.year) + \
-		'/' + str(posteventday.year) + '_' + str(posteventday.julday).zfill(3) + '*/*LH*.seed', \
-		starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
-		st += read(dataprefix2 + net + '_' + sta + '/' + str(preeventday.year) + \
-		'/' + str(preeventday.year) + '_' + str(preeventday.julday).zfill(3) + '*/*LH*.seed', \
-		starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
+	st = Stream()
+	for dataprefixs in dataprefix:
+		try:
+			st += read(dataprefixs + net + '_' + sta + '/' + str(eventtime.year) + \
+				'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '*/*LH*.seed', \
+				starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
+			st += read(dataprefixs + net + '_' + sta + '/' + str(posteventday.year) + \
+				'/' + str(posteventday.year) + '_' + str(posteventday.julday).zfill(3) + '*/*LH*.seed', \
+				starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
+			st += read(dataprefixs + net + '_' + sta + '/' + str(preeventday.year) + \
+				'/' + str(preeventday.year) + '_' + str(preeventday.julday).zfill(3) + '*/*LH*.seed', \
+				starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
+		except:
+			if debuggetdata:
+				print 'Unable to get data'
+
 	st.merge(fill_value='latest')
 	if debuggetdata:
 		print 'We have data'
@@ -417,6 +417,15 @@ if __name__ == "__main__":
 	else:
 		dataloc = False
 
+
+	#Lets read in the dataless
+	curnet = parserval.network
+	try:
+		sp = Parser(datalessloc + curnet + ".dataless")
+	except:
+		print "Can not read the dataless."
+		exit(0)
+
 	for synfile in parserval.syn:
 	 
 
@@ -443,17 +452,12 @@ if __name__ == "__main__":
 		evename = synfile.split("/")
 		evename = evename[len(evename)-1]
 
-		curnet = parserval.network
+		
 
 		statfile = open(os.getcwd() + '/' + resultdir + '/Results' + evename + curnet + '.csv' ,'w')
 		statfile.write('net,sta,loc,chan,scalefac,lag,corr\n')
 
-		#Lets read in the dataless
-		try:
-			sp = Parser(datalessloc + curnet + ".dataless")
-		except:
-			print "Can not read the dataless."
-			exit(0)
+		
 		if not manstalist:
 			stations = getstalist(sp,eventtime,curnet)
 

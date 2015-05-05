@@ -184,10 +184,13 @@ def readcmt(cmt):
 
 def getdata(net,sta,eventtime,lents,dataloc):
 #This function goes to one of the archives and gets the data
-	debuggetdata = False
+	debuggetdata = True
 	preeventday = eventtime - 24*60*60
 	posteventday = eventtime + 24*60*60
 	prepostwin= 3000
+	chanType = 'LH'
+	if net in set(['GT']):
+		chanType = 'BH'
 #If II get off of /tr1 else get the data from /xs0 or /xs1
 	if net == 'II':
 		dataprefix1 = '/tr1/telemetry_days/'
@@ -209,13 +212,13 @@ def getdata(net,sta,eventtime,lents,dataloc):
 	for dataprefixs in dataprefix:
 		try:
 			st += read(dataprefixs + net + '_' + sta + '/' + str(eventtime.year) + \
-				'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '*/*LH*.seed', \
+				'/' + str(eventtime.year) + '_' + str(eventtime.julday).zfill(3) + '*/*' + chanType + '*.seed', \
 				starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
 			st += read(dataprefixs + net + '_' + sta + '/' + str(posteventday.year) + \
-				'/' + str(posteventday.year) + '_' + str(posteventday.julday).zfill(3) + '*/*LH*.seed', \
+				'/' + str(posteventday.year) + '_' + str(posteventday.julday).zfill(3) + '*/*' + chanType + '*.seed', \
 				starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
 			st += read(dataprefixs + net + '_' + sta + '/' + str(preeventday.year) + \
-				'/' + str(preeventday.year) + '_' + str(preeventday.julday).zfill(3) + '*/*LH*.seed', \
+				'/' + str(preeventday.year) + '_' + str(preeventday.julday).zfill(3) + '*/*' + chanType + '*.seed', \
 				starttime=eventtime-prepostwin,endtime=(eventtime+lents+prepostwin))
 		except:
 			if debuggetdata:
@@ -477,8 +480,16 @@ if __name__ == "__main__":
 			cursta = cursta[1]
 		
 			st = getdata(net,cursta,eventtime,lents,dataloc)
-		
-		
+			if len(st) == 0:
+				continue
+			if net in set(['GT']):
+				for tr in st:
+					if tr.stats.sampling_rate > 20:
+						tr.detrend('linear')
+						tr.taper(max_percentage=0.05, type='cosine')
+						tr.decimate(int(tr.stats.sampling_rate/4.))
+						tr.decimate(4)
+
 			#Lets go through each trace in the stream and deconvolve and filter
 			for trace in st:
 				#Here we get the response and remove it
@@ -535,7 +546,9 @@ if __name__ == "__main__":
 			
 			if debug:
 				print(finalstream)
-
+			if net in set(['GT']):
+				for tr in finalstream:
+					tr.stats.channel = tr.stats.channel.replace('B','L')
 		#We now have rotated data and filtered data so it is time to read in the synthetics and process them
 			syns = glob.glob(synfile + '/' + cursta + '.*.LX*.modes.sac')
 			synstream = Stream()

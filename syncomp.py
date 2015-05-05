@@ -184,12 +184,12 @@ def readcmt(cmt):
 
 def getdata(net,sta,eventtime,lents,dataloc):
 #This function goes to one of the archives and gets the data
-	debuggetdata = True
+	debuggetdata = False
 	preeventday = eventtime - 24*60*60
 	posteventday = eventtime + 24*60*60
 	prepostwin= 3000
 	chanType = 'LH'
-	if net in set(['GT']):
+	if (net in set(['GT'])) or (cursta == 'KBL'):
 		chanType = 'BH'
 #If II get off of /tr1 else get the data from /xs0 or /xs1
 	if net == 'II':
@@ -482,7 +482,7 @@ if __name__ == "__main__":
 			st = getdata(net,cursta,eventtime,lents,dataloc)
 			if len(st) == 0:
 				continue
-			if net in set(['GT']):
+			if (net in set(['GT'])) or (cursta == 'KBL'):
 				for tr in st:
 					if tr.stats.sampling_rate > 20:
 						tr.detrend('linear')
@@ -546,7 +546,7 @@ if __name__ == "__main__":
 			
 			if debug:
 				print(finalstream)
-			if net in set(['GT']):
+			if (net in set(['GT'])) or (cursta == 'KBL'):
 				for tr in finalstream:
 					tr.stats.channel = tr.stats.channel.replace('B','L')
 		#We now have rotated data and filtered data so it is time to read in the synthetics and process them

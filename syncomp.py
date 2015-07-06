@@ -336,8 +336,10 @@ def writestats(statfile,streamin,comp):
 			corr = "{0:.2f}".format(corr)
 			statfile.write(tr.stats.network + "," + tr.stats.station)
 			statfile.write("," + tr.stats.location + "," + tr.stats.channel + "," +  str(resi))
-			statfile.write("," + str(lag) + "," + str(corr) + "\n")
-	
+			statfile.write("," + str(lag) + "," + str(corr) + ", ")
+			statfile.write(str(tr.stats.starttime.month) + "/" + str(tr.stats.starttime.day) + \
+				"/" + str(tr.stats.starttime.year) + " " + str(tr.stats.starttime.hour) + ":" + \
+				str(tr.stats.starttime.minute) + ":" + str(tr.stats.starttime.second) + "\n")
 	except:	
 		if debug:
 			print 'No residual for' + cursta + ' ' + 'LH' + comp	

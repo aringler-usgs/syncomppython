@@ -460,7 +460,7 @@ if __name__ == "__main__":
 		
 
 		statfile = open(os.getcwd() + '/' + resultdir + '/Results' + evename + curnet + '.csv' ,'w')
-		statfile.write('net,sta,loc,chan,scalefac,lag,corr\n')
+		statfile.write('net,sta,loc,chan,scalefac,lag,corr,time\n')
 
 		
 		if not manstalist:

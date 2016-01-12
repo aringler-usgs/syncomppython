@@ -643,7 +643,7 @@ if __name__ == "__main__":
 					plot(tne,(comps.data*(10**3)),curcolor, label=comps.stats.location + ' ' + comps.stats.channel)
 				legend(prop={'size':6})
 				xlabel('Time (s)')
-				savefig(os.getcwd() + '/' + resultdir + '/' + cursta + \
+				savefig(os.getcwd() + '/' + resultdir + '/' + curnet + cursta + \
 				str(vertcomps[0].stats.starttime.year) + str(vertcomps[0].stats.starttime.julday) + \
 				str(vertcomps[0].stats.starttime.hour) + str(vertcomps[0].stats.starttime.minute) + '.jpg', format = 'jpeg', dpi=400)
 

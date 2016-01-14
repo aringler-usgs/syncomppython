@@ -61,18 +61,19 @@ def getdip(net,sta,loc,chan,evetime,xseedval):
 						dip = blkt.dip
 	return dip
 
-def rotatehorizontal(stream, angle):
+def rotatehorizontal(stream, angle1, angle2):
 	if stream[0].stats.channel in set(['LHE','LHN','BHE','BHN']):
 		stream.sort(['channel'],reverse=False)
-		stream[1].data = -stream[1].data
+		#stream[1].data = -stream[1].data
 #Function to rotate the data by a given angle
-        theta_r = math.radians(angle)
+        theta_r1 = math.radians(angle1)
+        theta_r2 = math.radians(angle2-90)  
 # create new trace objects with same info as previous
         rotatedN = stream[0].copy()
         rotatedE = stream[1].copy()
 # assign rotated data
-        rotatedN.data = stream[0].data*math.cos(- theta_r) + stream[1].data*math.sin(- theta_r)
-        rotatedE.data = stream[1].data*math.cos(- theta_r) - stream[0].data*math.sin(- theta_r)
+        rotatedN.data = stream[0].data*math.cos(theta_r1) - stream[1].data*math.sin(theta_r1)
+        rotatedE.data = stream[1].data*math.cos(theta_r2) + stream[0].data*math.sin(theta_r2)
 	rotatedN.stats.channel='LHN'
 	rotatedE.stats.channel='LHE'
 # return new streams object with rotated traces
@@ -542,11 +543,12 @@ if __name__ == "__main__":
 						print "Here are the number of traces:" + str(len(curlochorizontal)) + \
 							" which should be 2"
 						print(curlochorizontal)
-					azi=getorientation(net,cursta,curloc,curlochorizontal[0].stats.channel,eventtime,sp)
+					azi1=getorientation(net,cursta,curloc,curlochorizontal[0].stats.channel,eventtime,sp)
+					azi2=getorientation(net,cursta,curloc,curlochorizontal[1].stats.channel,eventtime,sp)   
 					if debug:
 						print "Here is the azimuth" + str(azi)
 					curlochorizontal = choptocommon(curlochorizontal)
-					finalstream += rotatehorizontal(curlochorizontal,azi)	
+					finalstream += rotatehorizontal(curlochorizontal,azi1,azi2)	
 			
 				if debug:
 					print(finalstream)

@@ -66,14 +66,27 @@ def rotatehorizontal(stream, angle1, angle2):
 		stream.sort(['channel'],reverse=False)
 		#stream[1].data = -stream[1].data
 #Function to rotate the data by a given angle
-        theta_r1 = math.radians(angle1)
-        theta_r2 = math.radians(angle2-90)  
+	
+		
+
+	theta_r1 = math.radians(angle1)
+	theta_r2 = math.radians(angle2)
+
+	if stream[0].stats.location == '60':
+		theta_r1 = 90.
+		theta_r2 = 0.
+		
+	if theta_r1 > theta_r2:
+		stream.sort(['channel'], reverse= True)
+		theta_r1, theta_r2 = theta_r2, theta_r1
+		print(stream)
+	
 # create new trace objects with same info as previous
         rotatedN = stream[0].copy()
         rotatedE = stream[1].copy()
 # assign rotated data
-        rotatedN.data = stream[0].data*math.cos(theta_r1) - stream[1].data*math.sin(theta_r1)
-        rotatedE.data = stream[1].data*math.cos(theta_r2) + stream[0].data*math.sin(theta_r2)
+        rotatedN.data = stream[0].data*math.cos(theta_r1) + stream[1].data*math.sin(theta_r1)
+        rotatedE.data = stream[1].data*math.cos(theta_r2-90.) - stream[0].data*math.sin(theta_r2-90.)
 	rotatedN.stats.channel='LHN'
 	rotatedE.stats.channel='LHE'
 # return new streams object with rotated traces

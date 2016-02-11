@@ -20,10 +20,11 @@ from obspy.core.util.version import read_release_version
 
 datalessloc = '/APPS/metadata/SEED/'
 
+
 def getorientation(net, sta, loc, chan, evetime, xseedval):
     # A function to get the orientation of a station at a specific time
-    for cursta in xseedval.stations:    
-    # As we scan through blockettes we need to find blockettes 50 and 52
+    for cursta in xseedval.stations:
+        # As we scan through blockettes we need to find blockettes 50 and 52
         for blkt in cursta:
             if blkt.id == 50:
                 # Pull the station info for blockette 50
@@ -34,7 +35,7 @@ def getorientation(net, sta, loc, chan, evetime, xseedval):
                         curdoy = strftime("%j", gmtime())
                         curyear = strftime("%Y", gmtime())
                         curtime = UTCDateTime(curyear + "-" +
-                                              curdoy + "T00:00:00.0") 
+                                              curdoy + "T00:00:00.0")
                         if blkt.start_date <= evetime:
                             azimuth = blkt.azimuth
                     elif blkt.start_date <= evetime and blkt.end_date >= evetime:
@@ -65,13 +66,14 @@ def getdip(net, sta, loc, chan, evetime, xseedval):
 
 def rotatehorizontal(stream, angle1, angle2):
     # Switch to E and N
+    
     if stream[0].stats.channel in set(['LHE', 'LHN', 'BHE', 'BHN']):
         stream.sort(['channel'], reverse=False)
 
     theta_r1 = math.radians(angle1)
     theta_r2 = math.radians(angle2)
     # if the components are swaped swap the matrix
-    if theta_r1 > theta_r2:
+    if theta_r1 > theta_r2 and ((360. - angle1) + angle2 < 0.):
         stream.sort(['channel'], reverse=True)
         theta_r1, theta_r2 = theta_r2, theta_r1
         print(stream)
@@ -79,10 +81,10 @@ def rotatehorizontal(stream, angle1, angle2):
     rotatedN = stream[0].copy()
     rotatedE = stream[1].copy()
     # assign rotated data
-    rotatedN.data = stream[0].data*math.cos(theta_r1) +\
-        stream[1].data*math.sin(theta_r1)
-    rotatedE.data = stream[1].data*math.cos(theta_r2-math.pi/2.) -\
-        stream[0].data*math.sin(theta_r2-math.pi/2.)
+    rotatedN.data = stream[0].data*math.cos(-theta_r1) +\
+        stream[1].data*math.sin(-theta_r1)
+    rotatedE.data = -stream[1].data*math.cos(-theta_r2-math.pi/2.) +\
+        stream[0].data*math.sin(-theta_r2-math.pi/2.)
     rotatedN.stats.channel = 'LHN'
     rotatedE.stats.channel = 'LHE'
     # return new streams object with rotated traces
@@ -213,7 +215,7 @@ def getdata(net, sta, eventtime, lents, dataloc):
         dataprefix1 = '/tr1/telemetry_days/'
         dataperfix = [dataprefix1]
     else:
-        if net in set(['IW','NE','US']):    
+        if net in set(['IW', 'NE', 'US']):    
             dataprefix = 'xs1'    
         else:
             dataprefix = 'xs0'
@@ -268,8 +270,8 @@ def getPAZ2(sp, net, sta, loc, chan, eventtime):
                         print 'End date: ' + str(blockette.end_date)
                         print 'Start date: ' + str(blockette.start_date)
                     if type(blockette.end_date) is str:
-                        curdoy = strftime("%j",gmtime())
-                        curyear = strftime("%Y",gmtime())
+                        curdoy = strftime("%j", gmtime())
+                        curyear = strftime("%Y", gmtime())
                         curtime = UTCDateTime(curyear + "-" + curdoy + "T00:00:00.0") 
                         if blockette.start_date <= eventtime:
                             channel_flag = True
@@ -527,13 +529,13 @@ if __name__ == "__main__":
                         trace.taper(max_percentage=0.05, type='cosine')
                         trace.simulate(paz_remove=paz)
                         # Here we filter
-                        trace.filter("bandpass",freqmin=userminfre, freqmax=usermaxfre, corners=filtercornerpoles)
+                        trace.filter("bandpass", freqmin=userminfre, freqmax=usermaxfre, corners=filtercornerpoles)
                         trace.integrate()
                         trace.taper(max_percentage=0.05, type='cosine')
 
                         trace.trim(starttime=eventtime + tshift/2,endtime=(eventtime+lents + tshift/2))
                         trace.detrend()
-                        trace.filter("bandpass",freqmin=userminfre,freqmax=usermaxfre, corners=filtercornerpoles)
+                        trace.filter("bandpass", freqmin=userminfre,freqmax=usermaxfre, corners=filtercornerpoles)
                     except:
                         print('Can not find the response')
                         st.remove(trace)
@@ -565,7 +567,7 @@ if __name__ == "__main__":
                     azi1=getorientation(net, cursta, curloc, curlochorizontal[0].stats.channel, eventtime, sp)
                     azi2=getorientation(net, cursta, curloc, curlochorizontal[1].stats.channel, eventtime, sp)   
                     if debug:
-                        print "Here is the azimuth" + str(azi)
+                        print "Here is the azimuth" + str(azi1) + ' ' + str(azi2)
                     curlochorizontal = choptocommon(curlochorizontal)
                     finalstream += rotatehorizontal(curlochorizontal, azi1, azi2)    
             

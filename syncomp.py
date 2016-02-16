@@ -66,14 +66,22 @@ def getdip(net, sta, loc, chan, evetime, xseedval):
 
 def rotatehorizontal(stream, angle1, angle2):
     # Switch to E and N
-    
+    debugRot = False
     if stream[0].stats.channel in set(['LHE', 'LHN', 'BHE', 'BHN']):
-        stream.sort(['channel'], reverse=False)
-
+        stream.sort(['channel'], reverse=True)
+        angle1, angle2 = angle2, angle1
+    if debugRot:
+        print(stream)
+        print 'Angle1: ' + str(angle1) + ' Angle2: ' + str(angle2)
     theta_r1 = math.radians(angle1)
     theta_r2 = math.radians(angle2)
+    swapSecond = False
+    if (angle2 >= 180. and angle2 <= 360.) or angle2 == 0.:
+        swapSecond = True 
     # if the components are swaped swap the matrix
-    if theta_r1 > theta_r2 and ((360. - angle1) + angle2 < 0.):
+    if theta_r1 > theta_r2 and swapSecond:
+        if debugRot:
+            print 'Swap the components: ' + str((360. - angle1) - angle2)
         stream.sort(['channel'], reverse=True)
         theta_r1, theta_r2 = theta_r2, theta_r1
         print(stream)

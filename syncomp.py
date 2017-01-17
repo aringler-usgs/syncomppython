@@ -338,7 +338,7 @@ def pltStream(stream, pltHandle, component, cmtlat=None, cmtlon=None,
     if component == 'Z':
         plt.subplot(3,1,1)
         title = stream[0].stats.network + ' ' + \
-                stream[0].stats.station
+                stream[0].stats.station + ' '
         starttime = stream[0].stats.starttime
         stime = str(starttime.year) + ' ' + str(starttime.julday) + \
                 ' ' + str(starttime.hour) + ':' + \
@@ -524,11 +524,17 @@ if __name__ == "__main__":
                 stF += synstream
 
                 synplot =  plt.figure(1)
-                for comp in ["Z", "N", "E"]:    
-                    pltStream(stF, synplot, comp,
-                              cmtlat=cmtlat, cmtlon=cmtlon,
-                              minfre=userminfre, maxfre=usermaxfre,
-                              resDir=resultdir)
+                for comp in ["Z", "N", "E"]:
+                    try:    
+                        pltStream(stF, synplot, comp,
+                                  cmtlat=cmtlat, cmtlon=cmtlon,
+                                  minfre=userminfre, maxfre=usermaxfre,
+                                  resDir=resultdir)
+                    except:
+                        print('Problem with: ' + stF[0].id)
                     # Time to write some info into the statfile
-                    writestats(statfile, stF, comp)
+                    try:
+                        writestats(statfile, stF, comp)
+                    except:
+                        print('Problem with: ' + stF[0].id)
         statfile.close()

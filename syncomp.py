@@ -507,8 +507,10 @@ if __name__ == "__main__":
                     if debug:
                         print "Here is the azimuth" + str(azi1) + ' ' + str(azi2)
                     curlochorizontal = choptocommon(curlochorizontal)
-                    stF += rotatehorizontal(curlochorizontal, azi1, azi2)    
-            
+                    try:
+                        stF += rotatehorizontal(curlochorizontal, azi1, azi2)    
+                    except:
+                        pass
                 for tr in stF.select(channel="BH*"):
                     tr.stats.channel = tr.stats.channel.replace('B','L')
 

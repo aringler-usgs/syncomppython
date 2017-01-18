@@ -533,10 +533,10 @@ if __name__ == "__main__":
                                   minfre=userminfre, maxfre=usermaxfre,
                                   resDir=resultdir)
                     except:
-                        print('Problem with: ' + stF[0].id)
+                        print('Problem with: ' + sta)
                     # Time to write some info into the statfile
                     try:
                         writestats(statfile, stF, comp)
                     except:
-                        print('Problem with: ' + stF[0].id)
+                        print('Problem with: ' + sta)
         statfile.close()

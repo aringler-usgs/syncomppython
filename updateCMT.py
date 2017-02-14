@@ -1,13 +1,21 @@
 #!/usr/bin/env python
+""" A script to read in the CMT information and output a mineos file 
 
-######################
-#UpdateCMT.py
-#Adam Ringler
-#
-#This code gets CMTs from Lamont and sets up a directory structure.
-#The code pulls ndk format CMTs and switches them to CMTSOLUTION and 
-#mineos format.
-#####################
+created by: Adam Ringler
+updated: Kimberly Schramm
+T
+his code gets CMTs from Lamont and sets up a directory structure.
+The code pulls ndk format CMTs and switches them to CMTSOLUTION and 
+mineos format.
+
+This script has dependencies that may require updating of
+your .bashrc $PATH variable. 
+ 
+Additionally, it will be creating ~/synInfo/croncode/qcmt.ndk.  If 
+you want this in a different location you will need to edit the code.
+You will also need to update the maksynCMT.py code with your desired path.
+"""
+
 import os
 import sys
 import datetime
@@ -16,14 +24,12 @@ import math
 #Debug flag for verbose output during run
 debug = True
 
-#Here we have the option of grabbing the large historic file
-backfill = True
+# this is the path where the synthetics will be created.
+cmtdirpath = '/SYNTHETICS'
+# this is the path where it will output information about all of the data it is 
+# getting. at the moment it is set to a directory in the user's home
+codepath = os.getenv('HOME')+'/synInfo'
 
-#Here is the location for the directory structure setup
-cmtdirpath = '/home/aringler/synthetics/syncompdev'
-codepath ='/home/aringler/synthetics/syncompdev/syncomppython'
-
-#Here is the minimum magnitude to use for the events
 minmag= 6.5
 
 #Download the latest CMT files and place them in the croncode location
@@ -72,7 +78,7 @@ while True:
 #This should probably be split.  However it is such a messy format we will stick to this
 		line1CMT = line2[0:14].strip() +  ' ' + line1[5:9] + ' ' + str(CMTdate.timetuple()[7]) + ' '
 		line1CMT = line1CMT + line1[16:18] + ' ' + line1[19:21] + ' ' + line1[22:26].ljust(5,'0') + ' '
-		line1CMT = line1CMT + line1[28:33] + ' ' + line1[34:41] + ' ' + line1[42:47].strip() + ' 1.0 '
+		line1CMT = line1CMT + line1[26:33] + ' ' + line1[34:41] + ' ' + line1[42:47].strip() + ' 1.0 '
 		line1CMT = line1CMT + line2[75:80].strip()
 		line4 = line4.split()
 		line3 = line3.split()
@@ -95,7 +101,10 @@ while True:
 		line5 = line5.split()
 		line1CMT = line1CMT + ' ' + M0 + ' ' + str(Mrr) + ' ' + str(Mtt) + ' ' + str(Mpp) + ' ' + str(Mrt)
 		line1CMT = line1CMT + ' ' + str(Mrp) + ' ' + str(Mtp) + ' 1.0e' + CMTexp + ' ' + line5[11] + ' '
-		line1CMT = line1CMT + line5[12] + ' ' + line5[13] + ' ' + line5[14] + ' ' + line5[15] + ' ' + line5[16]	
+		line1CMT = line1CMT + line5[12] + ' ' + line5[13] + ' ' + line5[14] + ' ' + line5[15] + ' ' + line5[16]	+ '\n'
+# kas - added a \n to the end of line1CMT.  Mineos needs to have an EOL or you 
+# get a fortran runtime error.
+
 		
 #Put in event directory
 		if not os.path.exists(cmtdirpath + '/' + line1[5:9]):

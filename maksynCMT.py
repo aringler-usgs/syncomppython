@@ -1,13 +1,21 @@
-#!/usr/bin/env python
+#! /usr/bin/env python
 
-######################
-#UpdatesynCMT.py
-#Adam Ringler
-#
-#This code takes the CMTmineos solutions and produces synthetics.  This
-#code assumes you have an installation of MINEOS and it is setup with
-#path information
-#####################
+
+"""
+Compute synthetic seismograms.
+
+This script has many directory dependencies that may require updating of
+your .bashrc $PATH variable.  You need to have /usr/local/bin in order to 
+run the mineos functions.  Try a "which green" at a command prompt to make sure that it is in your user path and/or exists on the machine you are running.
+
+There are also precomputed mode files which you will need either a copy or a 
+symbolic link in your codepath. Make sure that you update the codepath variable 
+to reflect your directory structure. At the moment it will look for the infor-
+mation in $HOME/synInfo.  synInfo should have subdirectories:
+     auxfiles/ - contains station information files and modefiles/ directory.
+    modefiles/ - contains the normal mode information for calculating the
+                 synthetic seismogram.
+"""
 
 import os
 import glob
@@ -16,65 +24,13 @@ import shutil
 
 debug = False
 
-#Here is where your CMTs are as created by updateCMT.py
-cmtdirpath = '/home/aringler/syncomppython'
 
-#Here is where the MINEOS code resides
-codepath = '/home/aringler/syncomppython'
-
-def rungreen(event,codepath,currdir):
-#This function runs the greens functions using the codepath and the event info
-
-#Here is the length of the time series we are using
-	tslen = str(8000)
-
-#Lets setup the parameter file to run the Greens functions		
-	parafile = open('parameter_file','w')
-	parafile.write(codepath + '/auxfiles/longNEW\n')
-	parafile.write(codepath + '/auxfiles/modefiles/db_list\n')
-	parafile.write(event + '/currCMTmineos\n')
-
-#Lets do the first 260 modes
-	parafile.write('0 260\n')
-
-	parafile.write(tslen + '\n')
-	parafile.write('green\n')
-	parafile.close()
-
-#We can now feed the code into the greens program
-	os.system(codepath + '/bin/green < parameter_file')
-	os.remove('parameter_file')
-	shutil.copy2(codepath + '/auxfiles/longNEW.site', currdir + '/green.site')			
-	shutil.copy2(codepath + '/auxfiles/longNEW.sitechan', currdir + '/green.sitechan')
-	return;
-
-
-def runsyndat(event,codepath,currdir):
-#This function runs the synthetics using syndat from Mineos
-	if os.path.exists(currdir + 'Syndat.wfdisc'):
-#Need to clean up the Syndat
-			print 'Need to remove Syndat\n'
-	parafile = open('parameter_file','w')
-	parafile.write(event + '/currCMTmineos\n')
-	parafile.write('0\n')
-	parafile.write('green\n')
-	parafile.write('Syndat\n')
-	parafile.write('0\n')
-	parafile.close()
-	os.system(codepath + '/bin/syndat < parameter_file')
-	os.remove(currdir + '/parameter_file')
-	shutil.copy2(codepath + '/auxfiles/longNEW.site', currdir + '/Syndat.site')			
-	shutil.copy2(codepath + '/auxfiles/longNEW.sitechan', currdir + '/Syndat.sitechan')
-	os.system(codepath + '/bin/creat_origin ' + event + '/currCMTmineos Syndat')	
-	return;
-
-
-
-
-
-
-
-#Lets get all of the events for years starting with 1 and 2
+# this is where the program expects to find the mineos input file 
+# containing the CMT event information
+cmtdirpath = '/SYNTHETICS'
+# this is where the program expects to find the station information and the
+# mode information.
+codepath = os.getenv('HOME')+'/synInfo'
 eventlist = glob.glob(cmtdirpath + '/2*/*') + glob.glob(cmtdirpath + '/1*/*')
 currdir = os.getcwd()
 
@@ -95,45 +51,93 @@ for ind, event in enumerate(eventlist):
 		if debug:
 			print 'No synthetics for this event'
 
-#Run the greens functions		
-		rungreen(event,codepath,currdir)
+# Set up the input file to run the mineos greens function.		
+# the output from the greens function is a *.wf_disc file used in 
+# syndat
+# inputs needed are precomputed eigenfunctions from mineos_bran
+# and eigcon.  
+		parafile = open('parameter_file','w')
+                print 'writing parameters'
+# this is the path to the database files (directory containing .site and
+# .sitechan files)
+		parafile.write(codepath + '/auxfiles/longNEW\n')
+# this is the file within the normal modes database
+		parafile.write(codepath + '/auxfiles/modefiles/db_list\n')
+# this is the file with the CMT information
+		parafile.write(event + '/currCMTmineos\n')
+# this is the minumum and maximum frequencies
+		parafile.write('0. 260.\n')
+# this is the number of pts in the greens function.  This must be >= 30K
+		parafile.write('8000\n')
+# this is the green functions output file name
+		parafile.write('green\n')
+		parafile.close()
+# this will take the parameter file created above and calculate the 
+# green's functions
+		os.system('green < parameter_file')
+# then we remove the file.
+		os.remove('parameter_file')
 
-#Now we run the syndat piece of Mineos		
-		runsyndat(event,codepath,currdir)
+# this is the path to the station information.
+		shutil.copy2(codepath + '/auxfiles/longNEW.site', currdir + '/green.site')			
+		shutil.copy2(codepath + '/auxfiles/longNEW.sitechan', currdir + '/green.sitechan')
 		
-#Lets convert the synthetics to SAC format
-		os.system(codepath + '/bin/cucss2sac Syndat Syns')
+# Check to see if we need to clean up the Syndat
+		if os.path.exists(currdir + 'Syndat.wfdisc'):
+			print 'Need to remove Syndat\n'
+# build the input parameter file for cucss2sac - transforms file to sac format
+		parafile = open('parameter_file','w')
+		parafile.write(event + '/currCMTmineos\n')
+		parafile.write('0\n')
+		parafile.write('green\n')
+		parafile.write('Syndat\n')
+		parafile.write('0\n')
+		parafile.close()
+		os.system('syndat < parameter_file')
+		os.remove(currdir + '/parameter_file')
+		shutil.copy2(codepath + '/auxfiles/longNEW.site', currdir + '/Syndat.site')			
+		shutil.copy2(codepath + '/auxfiles/longNEW.sitechan', currdir + '/Syndat.sitechan')
+		os.system('creat_origin ' + event + '/currCMTmineos Syndat')
+
+		os.system('cucss2sac Syndat Syns')
+
 #Time to clean up stuff
 		os.system('rm -r ' + currdir + '/Syndat.*')
 		os.system('rm -r ' + currdir + '/green.*')
+#rename the output files to something we like better
+#first create a list
 		synall = glob.glob(currdir + '/Syns/*.SAC')
 
 #Here we are changing from H to X to get no network		
 		for syncur in synall:
-			os.rename(syncur, syncur.replace(' ',''))
-			syncur=syncur.replace(' ','')
+# get rid of spaces and replace with 0 - makes all of doy's 3 chars
+			os.rename(syncur, syncur.replace(' ','0'))
+			syncur=syncur.replace(' ','0')
+# replace colons with periods
 			syncurchan = syncur.replace(':','.')
 			syncurchan = syncurchan.split('.')
+# rename the channels, using X for a synthetic
 			syncurchan[6] = syncurchan[6].replace('H','X')
+# add a different ending
 			syncurchan = syncurchan[5] + '.XX.' + syncurchan[6] + '.modes.sac'
 			if debug:
 				print 'Old synthetic:' + syncur
 				print 'New synthetic:' + syncurchan
 				print 'Move to location:' + event + '/' + syncurchan
-			os.system('mv ' + syncur + ' ' + event + '/' + syncurchan)
+#  move things around 
+			os.system('cp ' + syncur + ' ' + event + '/' + syncurchan)
+# do some clean up
 		os.system('rm -r ' + currdir + '/Syns')
 
-#Here we setup our process_syn.pl code to do the pre-processing
-#This should be removed and done in python later as it is really sloppy
+# add some info into the synthetic file headers using a perl script. if
+# you are curious about these options take a look at the script.
+
 		synprostr = '-S -m ' + event + '/CMTSOLUTION '
 		synprostr = synprostr + '-s 1.0 -l 0/4000 -t 40/400 -x proc ' 
 		synprostr = synprostr + event + '/*modes.sac '	
 		print synprostr
-		os.system(codepath + '/bin/process_syn.pl ' + synprostr )
+## make sure the process_syn.pl is in your path
+		os.system('process_syn.pl ' + synprostr )
 		os.system('rm -r ' + event + '/*modes.sac')
 		os.system('chmod -R 755 ' + event)
 sys.exit(0)
-	
-
-
-

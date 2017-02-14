@@ -214,7 +214,7 @@ def getdata(net, sta, eventtime, lents, debug=False):
     At ASL the archives are located in:
         /tr1/telemetry_days
       or
-       /xs*/seed
+       /msd
     depending on how long since the event passed.
 """
     stime = eventtime - 3000.
@@ -227,7 +227,7 @@ def getdata(net, sta, eventtime, lents, debug=False):
         chan = 'BH'
 
 # Grab the data locations
-    datalocs = ['/tr1/telemetry_days/', '/xs*/seed/']
+    datalocs = ['/tr1/telemetry_days/', '/msd/']
 
     files = []
 # Grab the files and deal with edge cases
@@ -347,7 +347,7 @@ def getargs():
     return parserval
 
     
-def procStream(st, sp, eventtime, tshift, freqmin, freqmax, corners, lents, debug=False):
+def procStream(st, sp, eventtime, tshift, freqmin, freqmax, corners, lents, hdur, debug=False):
 """ Deconvolve and filter each trace in the stream. """
     if len(st.select(channel="LX*")) > 0:
         synthetic = True
@@ -547,7 +547,7 @@ if __name__ == "__main__":
                             tr.decimate(4)
 
 # Lets go through each trace in the stream and deconvolve and filter
-                st = procStream(st, sp, eventtime, tshift, userminfre, usermaxfre, filtercornerpoles, lents)
+                st = procStream(st, sp, eventtime, tshift, userminfre, usermaxfre, filtercornerpoles, lents, hdur)
 # Lets check for reverse polarity and fix
 
                 st = fixdip(st, eventtime, sp)

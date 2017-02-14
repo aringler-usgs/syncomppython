@@ -50,6 +50,8 @@ from obspy.core.util.geodetics import gps2DistAzimuth
 from obspy.signal.cross_correlation import xcorr
 from obspy.core.util.version import read_release_version
 
+from scipy import signal
+
 
 
 
@@ -235,7 +237,7 @@ def getdata(net, sta, eventtime, lents, debug=False):
         for year in range(stime.year, etime.year+1):
             for day in range(stime.julday, etime.julday+1):
                 string = dataloc + net + '_' + sta + '/' + \
-                        str(year) + '/' + str(stime.year) + '_' + \
+                        str(year) + '/' + '*' + \
                         str(day).zfill(3) + '*/*' + chan + '*.seed'
                 files += glob.glob(string)
     if debug:
@@ -348,6 +350,7 @@ def getargs():
 
     
 def procStream(st, sp, eventtime, tshift, freqmin, freqmax, corners, lents, hdur, debug=False):
+
 """ Deconvolve and filter each trace in the stream. """
     if len(st.select(channel="LX*")) > 0:
         synthetic = True
@@ -364,6 +367,8 @@ def procStream(st, sp, eventtime, tshift, freqmin, freqmax, corners, lents, hdur
             if synthetic:
                 tr.data /= (10**9)
                 tr.stats.starttime += float(tshift)/2.
+                win = signal.hann(int(2*hdur))
+                tr.data = signal.convolve(tr.data,win, mode='same')/sum(win)
             else:
                 paz=sp.get_paz(tr.id, eventtime)
                 if debug:
@@ -585,7 +590,7 @@ if __name__ == "__main__":
                 for tr in synstream:
                     tr.stats.channel = (tr.stats.channel).replace('LH','LX')
                     tr.stats.network = net  
-                synstream = procStream(synstream, sp, eventtime, tshift, userminfre, usermaxfre, filtercornerpoles, lents)
+                synstream = procStream(synstream, sp, eventtime, tshift, userminfre, usermaxfre, filtercornerpoles, lents, hdur)
                 
                 stF += synstream
 

@@ -1,17 +1,19 @@
 #!/usr/bin/env python
-import glob, os
+import glob
+import os
 
 debug = True
 
 
 #Here is where you can have the results placed.  You will need to change this
-resdir = '/home/aringler/synthetics/results'
+resdir = os.getenv('HOME')+'/synthetics/results'
 
 #Here is where the synthetics reside.  You probably do not need to change this
 syndir = '/SYNTHETICS'
 
 #Here is the path to where syncomp.py resides this will be in your local git repostiry
-syncompdir = '/home/aringler/synthetics/syncomppython'
+# you may need to update this depending on where you keep your scripts
+syncompdir = os.getenv('HOME')+'/python/syncomppython'
 nets = ['IU','IC','CU','US','IW','NE','II']
 
 if debug:

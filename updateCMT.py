@@ -1,5 +1,13 @@
 #!/usr/bin/env python
+""" A script to read in the CMT information and output a mineos file 
 
+This script has dependencies that may require updating of
+your .bashrc $PATH variable. 
+ 
+Additionally, it will be creating ~/synInfo/croncode/qcmt.ndk.  If 
+you want this in a different location you will need to edit the code.
+You will also need to update the maksynCMT.py code as well.
+"""
 import os
 import sys
 import datetime
@@ -7,8 +15,11 @@ import math
 
 debug = bool(0)
 
-cmtdirpath = '/home/aringler/syncomppython'
-codepath ='/home/aringler/syncomppython'
+# this is the path where the synthetics will be created.
+cmtdirpath = '/SYNTHETICS'
+# this is the path where it will output information about all of the data it is 
+# getting. at the moment it is set to a directory in the user's home
+codepath = os.getenv('HOME')+'/synInfo'
 minmag= 6.5
 
 #Download the latest CMT files
@@ -41,7 +52,7 @@ while True:
 			print 'Here is the day of year ' + str(CMTdate.timetuple()[7])
 		line1CMT = line2[0:14].strip() +  ' ' + line1[5:9] + ' ' + str(CMTdate.timetuple()[7]) + ' '
 		line1CMT = line1CMT + line1[16:18] + ' ' + line1[19:21] + ' ' + line1[22:26].ljust(5,'0') + ' '
-		line1CMT = line1CMT + line1[28:33] + ' ' + line1[34:41] + ' ' + line1[42:47].strip() + ' 1.0 '
+		line1CMT = line1CMT + line1[26:33] + ' ' + line1[34:41] + ' ' + line1[42:47].strip() + ' 1.0 '
 		line1CMT = line1CMT + line2[75:80].strip()
 		line4 = line4.split()
 		line3 = line3.split()
@@ -62,7 +73,10 @@ while True:
 		line5 = line5.split()
 		line1CMT = line1CMT + ' ' + M0 + ' ' + str(Mrr) + ' ' + str(Mtt) + ' ' + str(Mpp) + ' ' + str(Mrt)
 		line1CMT = line1CMT + ' ' + str(Mrp) + ' ' + str(Mtp) + ' 1.0e' + CMTexp + ' ' + line5[11] + ' '
-		line1CMT = line1CMT + line5[12] + ' ' + line5[13] + ' ' + line5[14] + ' ' + line5[15] + ' ' + line5[16]	
+		line1CMT = line1CMT + line5[12] + ' ' + line5[13] + ' ' + line5[14] + ' ' + line5[15] + ' ' + line5[16]	+ '\n'
+# kas - added a \n to the end of line1CMT.  Mineos needs to have an EOL or you 
+# get a fortran runtime error.
+
 		
 #Put in event directory
 		if not os.path.exists(cmtdirpath + '/' + line1[5:9]):

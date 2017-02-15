@@ -1,5 +1,36 @@
 #!/usr/bin/env python
 
+#########################################################################
+# syncomp.py
+#
+# created by Adam Ringler
+# modified by Kimberly Schramm
+#   updated some of the obspy import statements
+#   added documentation for user clarity
+# 
+# future work:
+# - we seem to be reading blockette 50 often.  Would it be more efficient
+#   to read it once and pass it to the functions that need it?
+#
+# - Adam has a remark about using something other than a station list
+#########################################################################
+
+""" 
+    syncomp.py 
+        Plots up synthetic seismograms calculated from Mineos with data
+        as a tool to find instrument problems not easily seen by eye.
+        
+        to run:
+        syncomp.py -syn /SYNTHETICS/2017/C201701032152A -n CU -resDir 2017_003
+        where
+        -syn /SYNTHETICS/2017/C201701032152A is the directory containing the 
+            synthetics and CMT information
+        -resDir 2017_003 is the directory to place the plots in
+        -n CU is the network you wish to plot 
+        -sta GRGR is for a single station plot (do not specify station
+            if you want to plot up the entire network) 
+"""
+
 import sys
 import os
 import glob
@@ -12,10 +43,10 @@ import argparse
 import matplotlib.pyplot as plt
 from obspy import read, Stream
 from obspy.core import UTCDateTime
-from obspy.io.xseed import Parser
+from obspy.xseed import Parser
 
 from time import gmtime, strftime
-from obspy.geodetics import gps2dist_azimuth
+from obspy.core.util.geodetics import gps2DistAzimuth
 from obspy.signal.cross_correlation import xcorr
 from obspy.core.util.version import read_release_version
 
@@ -23,15 +54,19 @@ from scipy import signal
 
 
 
+
 def getorientation(tr, sp):
+""" 
+A function to get the orientation of a station at a specific time from
+the metadata.
+"""
     sta, net, chan, loc = getsncl(tr)
     evetime = tr.stats.starttime
-    # A function to get the orientation of a station at a specific time
     for cursta in sp.stations:
-        # As we scan through blockettes we need to find blockettes 50 and 52
+# As we scan through blockettes we need to find blockettes 50 and 52
         for blkt in cursta:
             if blkt.id == 50:
-                # Pull the station info for blockette 50
+# Pull the station info for blockette 50
                 stacall = blkt.station_call_letters.strip()
             if stacall == sta:
                 if blkt.id == 52 and blkt.location_identifier == loc and blkt.channel_identifier == chan:
@@ -48,15 +83,18 @@ def getorientation(tr, sp):
 
 
 def getdip(tr, sp):
+""" 
+A function to get the dip of a station at a specific time from
+the metadata.
+"""
     sta, net, chan, loc = getsncl(tr)
     evetime = tr.stats.starttime
-    # A function to get the dip of a station at a specific time
     dip = 0.
     for cursta in sp.stations:
-        # As we scan through blockettes we need to find blockettes 50 and 52
+# As we scan through blockettes we need to find blockettes 50 and 52
         for blkt in cursta:
             if blkt.id == 50:
-                # Pull the station info for blockette 50
+# Pull the station info for blockette 50
                 stacall = blkt.station_call_letters.strip()
             if stacall == sta:
                 if blkt.id == 52 and blkt.location_identifier == loc and blkt.channel_identifier == chan:
@@ -73,7 +111,10 @@ def getdip(tr, sp):
 
 
 def rotatehorizontal(stream, angle1, angle2):
-    # Switch to E and N
+"""
+A function to rotate the horizontal components of a seismometer from 
+radial and transverse into E and North components.
+"""
     debugRot = False
     if stream[0].stats.channel in set(['LHE', 'LHN', 'BHE', 'BHN']):
         stream.sort(['channel'], reverse=True)
@@ -86,43 +127,45 @@ def rotatehorizontal(stream, angle1, angle2):
     swapSecond = False
     if (angle2 >= 180. and angle2 <= 360.) or angle2 == 0.:
         swapSecond = True 
-    # if the components are swaped swap the matrix
+# if the components are swaped swap the matrix
     if theta_r1 > theta_r2 and swapSecond:
         if debugRot:
             print 'Swap the components: ' + str((360. - angle1) - angle2)
         stream.sort(['channel'], reverse=True)
         theta_r1, theta_r2 = theta_r2, theta_r1
         print(stream)
-    # create new trace objects with same info as previous
+# create new trace objects with same info as previous
     rotatedN = stream[0].copy()
     rotatedE = stream[1].copy()
-    # assign rotated data
+# assign rotated data
     rotatedN.data = stream[0].data*math.cos(-theta_r1) +\
         stream[1].data*math.sin(-theta_r1)
     rotatedE.data = -stream[1].data*math.cos(-theta_r2-math.pi/2.) +\
         stream[0].data*math.sin(-theta_r2-math.pi/2.)
     rotatedN.stats.channel = 'LHN'
     rotatedE.stats.channel = 'LHE'
-    # return new streams object with rotated traces
+# return new streams object with rotated traces
     streamsR = Stream(traces=[rotatedN, rotatedE])
     return streamsR
 
 
 def choptocommon(stream):
-    # A function to chop the data to a common time window
+""" A function to chop the data to a common time window. """
     stime = max([tr.stats.starttime for tr in st])
     etime = min([tr.stats.endtime for tr in st])
     stream.trim(starttime=stime, endtime=etime)
+    print 'starttime: '+str(stime)+' endtime: '+str(etime)
     return stream
 
+
 def getstalist(sp, etime, net):
-    # A function to get a station list
+""" A function to get a station list. """
     stations = []
     for cursta in sp.stations:
-        # As we scan through blockettes we need to find blockettes 50 
+# As we scan through blockettes we need to find blockettes 50 
         for blkt in cursta:
             if blkt.id == 50:
-                # Pull the station info for blockette 50
+# Pull the station info for blockette 50
                 stacall = blkt.station_call_letters.strip()
                 if debug:
                     print "Here is a station in the dataless: " + stacall
@@ -139,9 +182,10 @@ def getstalist(sp, etime, net):
 
 
 def readcmt(cmt, debug=False):
-    # Now we can continue like there is no difference between 
-    # Princeton and our Synthetics
-    # Lets get the event time from the cmt
+""" read the CMT information contained in the synthetic directory """
+# Now we can continue like there is no difference between 
+# Princeton and our Synthetics.
+# Lets get the event time from the cmt.
     cmtline1 = ' '.join(cmt[0].split())
     cmtlat = cmt[4].replace('latitude:', '').strip()
     cmtlon = cmt[5].replace('longitude:', '').strip()
@@ -162,25 +206,33 @@ def readcmt(cmt, debug=False):
         print 'Day:' + str(eventtime.julday)
         print 'Hour:' + str(eventtime.hour)
         print 'Minute:' + str(eventtime.minute)
+    cmtlat=cmtlat*-1
     return cmtlat, cmtlon, eventtime, tshift, hdur
 
 
 def getdata(net, sta, eventtime, lents, debug=False):
-    # This function goes to both archives and gets the data
+"""
+    This function goes to both archives and gets the data.
+    At ASL the archives are located in:
+        /tr1/telemetry_days
+      or
+       /msd
+    depending on how long since the event passed.
+"""
     stime = eventtime - 3000.
     etime = eventtime + 3000. + lents
 
-    # Current default is LH add BH later
+# Current default is LH add BH later
     chan = 'LH'
 
     if (net in set(['GT'])) or (sta == 'KBL'):
         chan = 'BH'
 
-    # Grab the data locations
+# Grab the data locations
     datalocs = ['/tr1/telemetry_days/', '/msd/']
 
     files = []
-    # Grab the files and deal with edge cases
+# Grab the files and deal with edge cases
     for dataloc in datalocs:
         for year in range(stime.year, etime.year+1):
             for day in range(stime.julday, etime.julday+1):
@@ -203,6 +255,7 @@ def getdata(net, sta, eventtime, lents, debug=False):
     return st
     
 def fixdip(st, eventtime, sp, debug=False):
+""" Apply a correction to the dip """
     for tr in st.select(component="Z"):
         dipval = getdip(tr, sp)
         if debug:
@@ -213,6 +266,8 @@ def fixdip(st, eventtime, sp, debug=False):
 
 
 def getcolor(chan, loc):
+""" Set the color of the trace in the plot depending on the channel
+    or if it synthetic or observed data. """
     if chan in set(['LXN', 'LXE', 'LXZ']):
         color = 'k'
     elif (loc == '00' or loc ==''):
@@ -233,6 +288,10 @@ def getcolor(chan, loc):
 
 
 def writestats(statfile, streamin, comp):
+""" 
+    calculate the correlation coefficient and lag time for the synthetic
+    when compared to the observed data and write to a file.
+"""
     try:
         syncomp = "LX" + comp    
         datacomp = "LH" + comp
@@ -254,7 +313,7 @@ def writestats(statfile, streamin, comp):
 
 
 def getargs():
-    # Grab command line arguments to run synthetics
+""" Grab command line arguments to run synthetics. """
     parser = argparse.ArgumentParser(description = "Program to compare long-period event synthetics to data")
 
     parser.add_argument('-n', type=str, action="store",
@@ -291,7 +350,8 @@ def getargs():
 
     
 def procStream(st, sp, eventtime, tshift, freqmin, freqmax, corners, lents, hdur, debug=False):
-    # Lets go through each trace in the stream and deconvolve and filter
+
+""" Deconvolve and filter each trace in the stream. """
     if len(st.select(channel="LX*")) > 0:
         synthetic = True
     else:
@@ -301,8 +361,9 @@ def procStream(st, sp, eventtime, tshift, freqmin, freqmax, corners, lents, hdur
         print('Synthetics: ' + str(synthetic))
     for tr in st:
         try:
-            # Here we get the response and remove it
-            # Here is where I am mucking around
+# Here we get the response and remove it
+# Here is where I (Adam) am mucking around
+# Here is where Kim wonders if Adam is done mucking around.
             if synthetic:
                 tr.data /= (10**9)
                 tr.stats.starttime += float(tshift)/2.
@@ -320,7 +381,7 @@ def procStream(st, sp, eventtime, tshift, freqmin, freqmax, corners, lents, hdur
             tr.taper(max_percentage=0.05, type='cosine')
             if not synthetic:
                 tr.simulate(paz_remove=paz)
-            # Here we filter
+# Here we filter
             tr.filter("bandpass", freqmin=freqmin, freqmax=freqmax, corners=corners)
             tr.integrate()
             if synthetic:
@@ -339,6 +400,7 @@ def procStream(st, sp, eventtime, tshift, freqmin, freqmax, corners, lents, hdur
     
 def pltStream(stream, pltHandle, component, cmtlat=None, cmtlon=None,
               minfre=None, maxfre=None, resDir=None, debug = False):
+""" Plot the synthetic and observed traces. """
     if component == 'Z':
         plt.subplot(3,1,1)
         title = stream[0].stats.network + ' ' + \
@@ -362,10 +424,10 @@ def pltStream(stream, pltHandle, component, cmtlat=None, cmtlon=None,
         dist = "{0:.1f}".format(0.0089932*dist[0]/1000.)
         title += 'Dist:' + str(dist)
         title += ' BAzi:' + str(bazi)
-        # Add period band
+# Add period band
         title += str("{0:.0f}".format(1/maxfre)) + '-' + \
                  str("{0:.0f}".format(1/minfre)) + ' s per.'
-        # The title is now finished
+# The title is now finished
         plt.title(title, fontsize=12)
     elif component == 'N':
         plt.subplot(3,1,2)
@@ -376,6 +438,8 @@ def pltStream(stream, pltHandle, component, cmtlat=None, cmtlon=None,
     else:
         print('Unable to plot: ' + str(component))
         return
+# numpy.arange creates an evenly spaced array from 0, npts in the stream.
+# dividing by sampling rate gives us a time.
     t = np.arange(0, stream[0].stats.npts)/stream[0].stats.sampling_rate
     stream.sort(['location'])
     for tr in stream.select(component=component):
@@ -395,7 +459,7 @@ def pltStream(stream, pltHandle, component, cmtlat=None, cmtlon=None,
     return
 
 def getsncl(tr):
-    # Return the snlc
+""" Return the sncl """
     nslc = (tr.id).split('.')
     return nslc[1], nslc[0], nslc[3], nslc[2]
                 
@@ -406,21 +470,21 @@ if __name__ == "__main__":
     
     datalessloc = '/APPS/metadata/SEED/'
 
-    # Lets get the parser arguments
+# Lets get the parser arguments
     parserval = getargs()
 
-    # Debug flag
+# Debug flag
     debug = parserval.debug
 
-    # Length of time series
+# Length of time series
     lents = parserval.lents
 
-    # Grab the filter parameters
+# Grab the filter parameters
     userminfre = 1.0/float(parserval.filter[1])
     usermaxfre = 1.0/float(parserval.filter[0])
     filtercornerpoles = int(parserval.filter[2])
 
-    # Lets read in the dataless
+# Lets read in the dataless
     net = parserval.network
     try:
         sp = Parser(datalessloc + net + ".dataless")
@@ -428,13 +492,13 @@ if __name__ == "__main__":
         print "Can not read the dataless."
         exit(0)
 
-    # Run through each of the event CMTs
+# Run through each of the event CMTs
     for synfile in parserval.syn:
      
         if synfile[-1] == '/':
             synfile = synfile[:-1]
 
-        # Read in the CMT solution         
+# Read in the CMT solution from the synthetic directory
         if debug:
             print "We are using local synthetics"
         if not os.path.isfile(synfile + '/CMTSOLUTION'):
@@ -443,8 +507,7 @@ if __name__ == "__main__":
         cmt = tuple(open(synfile + '/CMTSOLUTION'))
         cmtlat, cmtlon, eventtime, tshift, hdur = readcmt(cmt)
 
-
-        # Lets make a local results directory
+# Lets make a local results directory
         resultdir = parserval.resDir
         if resultdir[-1] == '/':
             resultdir = resultdir[:-1]
@@ -454,10 +517,10 @@ if __name__ == "__main__":
         evename = synfile.split("/")
         evename = evename[len(evename)-1]
 
+# Open a file to write the correlation statistics 
         statfile = open(os.getcwd() + '/' + resultdir + '/Results' + evename + net + '.csv' ,'w')
         statfile.write('net,sta,loc,chan,scalefac,lag,corr,time\n')
 
-            
         if parserval.sta:
             if debug: 
                 print "We are using a manual station list"
@@ -471,7 +534,8 @@ if __name__ == "__main__":
                 print "Here is a station:" + sta
 
 
-        # Lets start by using a station list and then move to a different approach
+# Lets start by using a station list and then move to a 
+# different approach. (Adam)
         for sta in stations:
             #try:
             if True:
@@ -479,8 +543,7 @@ if __name__ == "__main__":
                 st = getdata(net, sta, eventtime, lents)
                 if len(st) == 0:
                     pass
-                    print 'Bad data for: ' + sta
-                # Decimate any high sample rate traces to 1
+# Decimate any high sample rate traces to 1
                 for tr in st:
                     if tr.stats.sampling_rate > 20:
                             tr.detrend('linear')
@@ -488,9 +551,9 @@ if __name__ == "__main__":
                             tr.decimate(int(tr.stats.sampling_rate/4.))
                             tr.decimate(4)
 
-                # Lets go through each trace in the stream and deconvolve and filter
+# Lets go through each trace in the stream and deconvolve and filter
                 st = procStream(st, sp, eventtime, tshift, userminfre, usermaxfre, filtercornerpoles, lents, hdur)
-                # Lets check for reverse polarity and fix
+# Lets check for reverse polarity and fix
 
                 st = fixdip(st, eventtime, sp)
                 stF = st.select(component="Z")
@@ -514,7 +577,9 @@ if __name__ == "__main__":
                     try:
                         stF += rotatehorizontal(curlochorizontal, azi1, azi2)    
                     except:
+                        print('no rotation on stF needed')
                         pass
+                       
                 for tr in stF.select(channel="BH*"):
                     tr.stats.channel = tr.stats.channel.replace('B','L')
 
@@ -529,6 +594,7 @@ if __name__ == "__main__":
                 
                 stF += synstream
 
+# synplot is a plot handle that opens up a figure.
                 synplot =  plt.figure(1)
                 for comp in ["Z", "N", "E"]:
                     try:    
@@ -538,7 +604,7 @@ if __name__ == "__main__":
                                   resDir=resultdir)
                     except:
                         print('Problem with: ' + sta)
-                    # Time to write some info into the statfile
+# Time to write some info into the statfile
                     try:
                         writestats(statfile, stF, comp)
                     except:

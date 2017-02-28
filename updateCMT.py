@@ -16,7 +16,7 @@ import math
 debug = bool(0)
 
 # this is the path where the synthetics will be created.
-cmtdirpath = '/SYNTHETICS'
+cmtdirpath = '/home/kschramm/SYNTHETICS'
 # this is the path where it will output information about all of the data it is 
 # getting. at the moment it is set to a directory in the user's home
 codepath = os.getenv('HOME')+'/synInfo'

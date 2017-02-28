@@ -83,10 +83,10 @@ the metadata.
 
 
 def getdip(tr, sp):
-""" 
-A function to get the dip of a station at a specific time from
-the metadata.
-"""
+#""" 
+#A function to get the dip of a station at a specific time from
+#the metadata.
+#"""
     sta, net, chan, loc = getsncl(tr)
     evetime = tr.stats.starttime
     dip = 0.
@@ -111,10 +111,10 @@ the metadata.
 
 
 def rotatehorizontal(stream, angle1, angle2):
-"""
-A function to rotate the horizontal components of a seismometer from 
-radial and transverse into E and North components.
-"""
+#"""
+#A function to rotate the horizontal components of a seismometer from 
+#radial and transverse into E and North components.
+#"""
     debugRot = False
     if stream[0].stats.channel in set(['LHE', 'LHN', 'BHE', 'BHN']):
         stream.sort(['channel'], reverse=True)
@@ -150,7 +150,7 @@ radial and transverse into E and North components.
 
 
 def choptocommon(stream):
-""" A function to chop the data to a common time window. """
+#""" A function to chop the data to a common time window. """
     stime = max([tr.stats.starttime for tr in st])
     etime = min([tr.stats.endtime for tr in st])
     stream.trim(starttime=stime, endtime=etime)
@@ -159,7 +159,7 @@ def choptocommon(stream):
 
 
 def getstalist(sp, etime, net):
-""" A function to get a station list. """
+#""" A function to get a station list. """
     stations = []
     for cursta in sp.stations:
 # As we scan through blockettes we need to find blockettes 50 
@@ -182,7 +182,7 @@ def getstalist(sp, etime, net):
 
 
 def readcmt(cmt, debug=False):
-""" read the CMT information contained in the synthetic directory """
+#""" read the CMT information contained in the synthetic directory """
 # Now we can continue like there is no difference between 
 # Princeton and our Synthetics.
 # Lets get the event time from the cmt.
@@ -211,14 +211,14 @@ def readcmt(cmt, debug=False):
 
 
 def getdata(net, sta, eventtime, lents, debug=False):
-"""
-    This function goes to both archives and gets the data.
-    At ASL the archives are located in:
-        /tr1/telemetry_days
-      or
-       /msd
-    depending on how long since the event passed.
-"""
+#"""
+#    This function goes to both archives and gets the data.
+#    At ASL the archives are located in:
+#        /tr1/telemetry_days
+#      or
+#       /msd
+#    depending on how long since the event passed.
+#"""
     stime = eventtime - 3000.
     etime = eventtime + 3000. + lents
 
@@ -255,7 +255,7 @@ def getdata(net, sta, eventtime, lents, debug=False):
     return st
     
 def fixdip(st, eventtime, sp, debug=False):
-""" Apply a correction to the dip """
+#""" Apply a correction to the dip """
     for tr in st.select(component="Z"):
         dipval = getdip(tr, sp)
         if debug:
@@ -266,8 +266,8 @@ def fixdip(st, eventtime, sp, debug=False):
 
 
 def getcolor(chan, loc):
-""" Set the color of the trace in the plot depending on the channel
-    or if it synthetic or observed data. """
+#""" Set the color of the trace in the plot depending on the channel
+#    or if it synthetic or observed data. """
     if chan in set(['LXN', 'LXE', 'LXZ']):
         color = 'k'
     elif (loc == '00' or loc ==''):
@@ -288,10 +288,10 @@ def getcolor(chan, loc):
 
 
 def writestats(statfile, streamin, comp):
-""" 
-    calculate the correlation coefficient and lag time for the synthetic
-    when compared to the observed data and write to a file.
-"""
+#""" 
+#    calculate the correlation coefficient and lag time for the synthetic
+#    when compared to the observed data and write to a file.
+#"""
     try:
         syncomp = "LX" + comp    
         datacomp = "LH" + comp
@@ -313,7 +313,7 @@ def writestats(statfile, streamin, comp):
 
 
 def getargs():
-""" Grab command line arguments to run synthetics. """
+#""" Grab command line arguments to run synthetics. """
     parser = argparse.ArgumentParser(description = "Program to compare long-period event synthetics to data")
 
     parser.add_argument('-n', type=str, action="store",
@@ -351,7 +351,7 @@ def getargs():
     
 def procStream(st, sp, eventtime, tshift, freqmin, freqmax, corners, lents, hdur, debug=False):
 
-""" Deconvolve and filter each trace in the stream. """
+#""" Deconvolve and filter each trace in the stream. """
     if len(st.select(channel="LX*")) > 0:
         synthetic = True
     else:
@@ -400,7 +400,7 @@ def procStream(st, sp, eventtime, tshift, freqmin, freqmax, corners, lents, hdur
     
 def pltStream(stream, pltHandle, component, cmtlat=None, cmtlon=None,
               minfre=None, maxfre=None, resDir=None, debug = False):
-""" Plot the synthetic and observed traces. """
+#""" Plot the synthetic and observed traces. """
     if component == 'Z':
         plt.subplot(3,1,1)
         title = stream[0].stats.network + ' ' + \

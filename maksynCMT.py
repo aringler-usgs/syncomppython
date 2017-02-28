@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python 
 
 
 """
@@ -27,7 +27,7 @@ debug = False
 
 # this is where the program expects to find the mineos input file 
 # containing the CMT event information
-cmtdirpath = '/SYNTHETICS'
+cmtdirpath = '/home/kschramm/SYNTHETICS'
 # this is where the program expects to find the station information and the
 # mode information.
 codepath = os.getenv('HOME')+'/synInfo'
@@ -83,6 +83,7 @@ for ind, event in enumerate(eventlist):
 		shutil.copy2(codepath + '/auxfiles/longNEW.sitechan', currdir + '/green.sitechan')
 		
 # Check to see if we need to clean up the Syndat
+                print (currdir)
 		if os.path.exists(currdir + 'Syndat.wfdisc'):
 			print 'Need to remove Syndat\n'
 # build the input parameter file for cucss2sac - transforms file to sac format
@@ -120,12 +121,19 @@ for ind, event in enumerate(eventlist):
 			syncurchan[6] = syncurchan[6].replace('H','X')
 # add a different ending
 			syncurchan = syncurchan[5] + '.XX.' + syncurchan[6] + '.modes.sac'
+  
 			if debug:
 				print 'Old synthetic:' + syncur
 				print 'New synthetic:' + syncurchan
 				print 'Move to location:' + event + '/' + syncurchan
 #  move things around 
-			os.system('cp ' + syncur + ' ' + event + '/' + syncurchan)
+# why isn't this working?
+#                        os.system('cp ' + syncur + ' ' + event + '/' + syncurchan)
+# trying shutil instead of os.system
+                        try:
+                            shutil.copyfile(syncur,event + '/' + syncurchan)
+                        except:
+                            print "Could not copy file"
 # do some clean up
 		os.system('rm -r ' + currdir + '/Syns')
 

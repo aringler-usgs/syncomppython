@@ -43,10 +43,10 @@ import argparse
 import matplotlib.pyplot as plt
 from obspy import read, Stream
 from obspy.core import UTCDateTime
-from obspy.xseed import Parser
+from obspy.io.xseed import Parser
 
 from time import gmtime, strftime
-from obspy.core.util.geodetics import gps2DistAzimuth
+from obspy.geodetics import gps2DistAzimuth
 from obspy.signal.cross_correlation import xcorr
 from obspy.core.util.version import read_release_version
 
@@ -56,10 +56,10 @@ from scipy import signal
 
 
 def getorientation(tr, sp):
-""" 
-A function to get the orientation of a station at a specific time from
-the metadata.
-"""
+    """ 
+    A function to get the orientation of a station at a specific time from
+    the metadata.
+    """
     sta, net, chan, loc = getsncl(tr)
     evetime = tr.stats.starttime
     for cursta in sp.stations:
@@ -83,10 +83,10 @@ the metadata.
 
 
 def getdip(tr, sp):
-""" 
-A function to get the dip of a station at a specific time from
-the metadata.
-"""
+    """ 
+    A function to get the dip of a station at a specific time from
+    the metadata.
+    """
     sta, net, chan, loc = getsncl(tr)
     evetime = tr.stats.starttime
     dip = 0.
@@ -111,10 +111,10 @@ the metadata.
 
 
 def rotatehorizontal(stream, angle1, angle2):
-"""
-A function to rotate the horizontal components of a seismometer from 
-radial and transverse into E and North components.
-"""
+    """
+    A function to rotate the horizontal components of a seismometer from 
+    radial and transverse into E and North components.
+    """
     debugRot = False
     if stream[0].stats.channel in set(['LHE', 'LHN', 'BHE', 'BHN']):
         stream.sort(['channel'], reverse=True)
@@ -149,17 +149,18 @@ radial and transverse into E and North components.
     return streamsR
 
 
-def choptocommon(stream):
-""" A function to chop the data to a common time window. """
+def choptocommon(st):
+    """ A function to chop the data to a common time window. """
     stime = max([tr.stats.starttime for tr in st])
     etime = min([tr.stats.endtime for tr in st])
-    stream.trim(starttime=stime, endtime=etime)
-    print 'starttime: '+str(stime)+' endtime: '+str(etime)
-    return stream
+    st.trim(starttime=stime, endtime=etime)
+    if debug:
+        print 'starttime: '+str(stime)+' endtime: '+str(etime)
+    return st
 
 
 def getstalist(sp, etime, net):
-""" A function to get a station list. """
+    """ A function to get a station list. """
     stations = []
     for cursta in sp.stations:
 # As we scan through blockettes we need to find blockettes 50 
@@ -182,13 +183,16 @@ def getstalist(sp, etime, net):
 
 
 def readcmt(cmt, debug=False):
-""" read the CMT information contained in the synthetic directory """
+    """ read the CMT information contained in the synthetic directory """
 # Now we can continue like there is no difference between 
 # Princeton and our Synthetics.
 # Lets get the event time from the cmt.
     cmtline1 = ' '.join(cmt[0].split())
-    cmtlat = cmt[4].replace('latitude:', '').strip()
-    cmtlon = cmt[5].replace('longitude:', '').strip()
+    if debug:
+        print(cmt[4])
+    cmtlat = float((cmt[4].replace('latitude:', '')).strip())
+
+    cmtlon = float(cmt[5].replace('longitude:', '').strip())
     tshift = float(cmt[2].replace('time shift:', '').strip())
     hdur = float(cmt[3].replace('half duration:', '').strip())
     if debug:
@@ -206,19 +210,18 @@ def readcmt(cmt, debug=False):
         print 'Day:' + str(eventtime.julday)
         print 'Hour:' + str(eventtime.hour)
         print 'Minute:' + str(eventtime.minute)
-    cmtlat=cmtlat*-1
     return cmtlat, cmtlon, eventtime, tshift, hdur
 
 
 def getdata(net, sta, eventtime, lents, debug=False):
-"""
-    This function goes to both archives and gets the data.
-    At ASL the archives are located in:
-        /tr1/telemetry_days
-      or
-       /msd
-    depending on how long since the event passed.
-"""
+    """
+        This function goes to both archives and gets the data.
+        At ASL the archives are located in:
+            /tr1/telemetry_days
+          or
+           /msd
+        depending on how long since the event passed.
+    """
     stime = eventtime - 3000.
     etime = eventtime + 3000. + lents
 
@@ -255,7 +258,7 @@ def getdata(net, sta, eventtime, lents, debug=False):
     return st
     
 def fixdip(st, eventtime, sp, debug=False):
-""" Apply a correction to the dip """
+    """ Apply a correction to the dip """
     for tr in st.select(component="Z"):
         dipval = getdip(tr, sp)
         if debug:
@@ -266,7 +269,7 @@ def fixdip(st, eventtime, sp, debug=False):
 
 
 def getcolor(chan, loc):
-""" Set the color of the trace in the plot depending on the channel
+    """ Set the color of the trace in the plot depending on the channel
     or if it synthetic or observed data. """
     if chan in set(['LXN', 'LXE', 'LXZ']):
         color = 'k'
@@ -288,10 +291,10 @@ def getcolor(chan, loc):
 
 
 def writestats(statfile, streamin, comp):
-""" 
+    """ 
     calculate the correlation coefficient and lag time for the synthetic
     when compared to the observed data and write to a file.
-"""
+    """
     try:
         syncomp = "LX" + comp    
         datacomp = "LH" + comp
@@ -313,7 +316,7 @@ def writestats(statfile, streamin, comp):
 
 
 def getargs():
-""" Grab command line arguments to run synthetics. """
+    """ Grab command line arguments to run synthetics. """
     parser = argparse.ArgumentParser(description = "Program to compare long-period event synthetics to data")
 
     parser.add_argument('-n', type=str, action="store",
@@ -351,7 +354,7 @@ def getargs():
     
 def procStream(st, sp, eventtime, tshift, freqmin, freqmax, corners, lents, hdur, debug=False):
 
-""" Deconvolve and filter each trace in the stream. """
+    """ Deconvolve and filter each trace in the stream. """
     if len(st.select(channel="LX*")) > 0:
         synthetic = True
     else:
@@ -400,7 +403,7 @@ def procStream(st, sp, eventtime, tshift, freqmin, freqmax, corners, lents, hdur
     
 def pltStream(stream, pltHandle, component, cmtlat=None, cmtlon=None,
               minfre=None, maxfre=None, resDir=None, debug = False):
-""" Plot the synthetic and observed traces. """
+    """ Plot the synthetic and observed traces. """
     if component == 'Z':
         plt.subplot(3,1,1)
         title = stream[0].stats.network + ' ' + \
@@ -419,7 +422,7 @@ def pltStream(stream, pltHandle, component, cmtlat=None, cmtlon=None,
             print "Longitude:" + str(lon)
             print "CMT Latitude:" + str(cmtlat)
             print "CMT Longitude:" + str(cmtlon)
-        dist = gps2dist_azimuth(float(cmtlat), float(cmtlon), lat, lon)
+        dist = gps2DistAzimuth(float(cmtlat), float(cmtlon), lat, lon)
         bazi = "{0:.1f}".format(dist[2])
         dist = "{0:.1f}".format(0.0089932*dist[0]/1000.)
         title += 'Dist:' + str(dist)
@@ -459,7 +462,7 @@ def pltStream(stream, pltHandle, component, cmtlat=None, cmtlon=None,
     return
 
 def getsncl(tr):
-""" Return the sncl """
+    """ Return the sncl """
     nslc = (tr.id).split('.')
     return nslc[1], nslc[0], nslc[3], nslc[2]
                 
@@ -593,11 +596,13 @@ if __name__ == "__main__":
                 synstream = procStream(synstream, sp, eventtime, tshift, userminfre, usermaxfre, filtercornerpoles, lents, hdur)
                 
                 stF += synstream
-
+                stF=choptocommon(stF)
+                
 # synplot is a plot handle that opens up a figure.
                 synplot =  plt.figure(1)
                 for comp in ["Z", "N", "E"]:
-                    try:    
+                    try:
+                    
                         pltStream(stF, synplot, comp,
                                   cmtlat=cmtlat, cmtlon=cmtlon,
                                   minfre=userminfre, maxfre=usermaxfre,

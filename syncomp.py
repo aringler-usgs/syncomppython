@@ -46,7 +46,7 @@ from obspy.core import UTCDateTime
 from obspy.io.xseed import Parser
 
 from time import gmtime, strftime
-from obspy.geodetics import gps2DistAzimuth
+from obspy.geodetics.base import gps2dist_azimuth
 from obspy.signal.cross_correlation import xcorr
 from obspy.core.util.version import read_release_version
 
@@ -422,7 +422,7 @@ def pltStream(stream, pltHandle, component, cmtlat=None, cmtlon=None,
             print "Longitude:" + str(lon)
             print "CMT Latitude:" + str(cmtlat)
             print "CMT Longitude:" + str(cmtlon)
-        dist = gps2DistAzimuth(float(cmtlat), float(cmtlon), lat, lon)
+        dist = gps2dist_azimuth(float(cmtlat), float(cmtlon), lat, lon)
         bazi = "{0:.1f}".format(dist[2])
         dist = "{0:.1f}".format(0.0089932*dist[0]/1000.)
         title += 'Dist:' + str(dist)
@@ -596,19 +596,19 @@ if __name__ == "__main__":
                 synstream = procStream(synstream, sp, eventtime, tshift, userminfre, usermaxfre, filtercornerpoles, lents, hdur)
                 
                 stF += synstream
-                stF=choptocommon(stF)
+
                 
 # synplot is a plot handle that opens up a figure.
                 synplot =  plt.figure(1)
                 for comp in ["Z", "N", "E"]:
                     try:
-                    
+                    #if True:
                         pltStream(stF, synplot, comp,
                                   cmtlat=cmtlat, cmtlon=cmtlon,
                                   minfre=userminfre, maxfre=usermaxfre,
                                   resDir=resultdir)
                     except:
-                        print('Problem with: ' + sta)
+                        print('Problem with: ' + sta + ' plotting')
 # Time to write some info into the statfile
                     try:
                         writestats(statfile, stF, comp)

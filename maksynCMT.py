@@ -1,4 +1,5 @@
-#! /usr/bin/env python
+#! /usr/bin/env python 
+
 
 """
 Compute synthetic seismograms.
@@ -15,21 +16,52 @@ mation in $HOME/synInfo.  synInfo should have subdirectories:
     modefiles/ - contains the normal mode information for calculating the
                  synthetic seismogram.
 """
+
 import os
 import glob
 import sys
 import shutil
 
+<<<<<<< HEAD
+debug = False
+
+
+# this is where the program expects to find the mineos input file 
+# containing the CMT event information
+cmtdirpath = '/home/kschramm/SYNTHETICS'
+=======
 debug = True
 
 # this is where the program expects to find the mineos input file 
 # containing the CMT event information
 cmtdirpath = '/home/aringler/synthetics/SYNTHETICS'
+>>>>>>> origin/master
 # this is where the program expects to find the station information and the
 # mode information.
 codepath = '/home/aringler/synthetics/syncomppython/synInfo'
 eventlist = glob.glob(cmtdirpath + '/2*/*') + glob.glob(cmtdirpath + '/1*/*')
 currdir = os.getcwd()
+<<<<<<< HEAD
+
+if debug:
+	print eventlist
+	print 'The current directory is:' + currdir
+
+#Time to loop through all of the events and create synthetics for them
+for ind, event in enumerate(eventlist):
+	print 'On event ' + str(ind + 1) + ' of ' + str(len(eventlist)) 
+	
+	if debug:
+		print event
+	
+#Okay we have an event if there are more than 2 files in the directory
+#This should eventually be made more robust
+	if len(os.listdir(event)) == 2:
+		if debug:
+			print 'No synthetics for this event'
+
+# Set up the input file to run the mineos greens function.		
+=======
 ind=0;
 if debug:
     print eventlist
@@ -43,6 +75,7 @@ for event in eventlist:
         if debug:
             print 'No synthetics for this event'
 # Set up the input file to run the mineos greens function.        
+>>>>>>> origin/master
 # the output from the greens function is a *.wf_disc file used in 
 # syndat
 # inputs needed are precomputed eigenfunctions from mineos_bran
@@ -76,8 +109,14 @@ for event in eventlist:
         shutil.copy2(codepath + '/auxfiles/longNEW.sitechan', currdir + '/green.sitechan')
         
 # Check to see if we need to clean up the Syndat
+<<<<<<< HEAD
+                print (currdir)
+		if os.path.exists(currdir + 'Syndat.wfdisc'):
+			print 'Need to remove Syndat\n'
+=======
         if os.path.exists(currdir + 'Syndat.wfdisc'):
             print 'Need to remove Syndat\n'
+>>>>>>> origin/master
 # build the input parameter file for cucss2sac - transforms file to sac format
         parafile = open('parameter_file','w')
         parafile.write(event + '/currCMTmineos\n')
@@ -92,14 +131,26 @@ for event in eventlist:
         shutil.copy2(codepath + '/auxfiles/longNEW.sitechan', currdir + '/Syndat.sitechan')
         os.system('bin/creat_origin ' + event + '/currCMTmineos Syndat')
 
+<<<<<<< HEAD
+		os.system('cucss2sac Syndat Syns')
+
+=======
         os.system('bin/cucss2sac Syndat Syns')
+>>>>>>> origin/master
 #Time to clean up stuff
         os.system('rm -r ' + currdir + '/Syndat.*')
         os.system('rm -r ' + currdir + '/green.*')
 #rename the output files to something we like better
 #first create a list
+<<<<<<< HEAD
+		synall = glob.glob(currdir + '/Syns/*.SAC')
+
+#Here we are changing from H to X to get no network		
+		for syncur in synall:
+=======
         synall = glob.glob(currdir + '/Syns/*.SAC')
         for syncur in synall:
+>>>>>>> origin/master
 # get rid of spaces and replace with 0 - makes all of doy's 3 chars
             os.rename(syncur, syncur.replace(' ','0'))
             syncur=syncur.replace(' ','0')
@@ -109,6 +160,32 @@ for event in eventlist:
 # rename the channels, using X for a synthetic
             syncurchan[6] = syncurchan[6].replace('H','X')
 # add a different ending
+<<<<<<< HEAD
+			syncurchan = syncurchan[5] + '.XX.' + syncurchan[6] + '.modes.sac'
+  
+			if debug:
+				print 'Old synthetic:' + syncur
+				print 'New synthetic:' + syncurchan
+				print 'Move to location:' + event + '/' + syncurchan
+#  move things around 
+# why isn't this working?
+#                        os.system('cp ' + syncur + ' ' + event + '/' + syncurchan)
+# trying shutil instead of os.system
+                        try:
+                            shutil.copyfile(syncur,event + '/' + syncurchan)
+                        except:
+                            print "Could not copy file"
+# do some clean up
+		os.system('rm -r ' + currdir + '/Syns')
+
+# add some info into the synthetic file headers using a perl script. if
+# you are curious about these options take a look at the script.
+
+		synprostr = '-S -m ' + event + '/CMTSOLUTION '
+		synprostr = synprostr + '-s 1.0 -l 0/4000 -t 40/400 -x proc ' 
+		synprostr = synprostr + event + '/*modes.sac '	
+		print synprostr
+=======
             syncurchan = syncurchan[5] + '.XX.' + syncurchan[6] + '.modes.sac'
             if debug:
                 print 'Old synthetic:' + syncur
@@ -125,6 +202,7 @@ for event in eventlist:
         synprostr = synprostr + '-s 1.0 -l 0/4000 -t 40/400 -x proc ' 
         synprostr = synprostr + event + '/*modes.sac '    
         print synprostr
+>>>>>>> origin/master
 ## make sure the process_syn.pl is in your path
         os.system('bin/process_syn.pl ' + synprostr )
         os.system('rm -r ' + event + '/*modes.sac')

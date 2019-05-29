@@ -71,7 +71,7 @@ def readcmt(cmt, debug=False):
     eventtime = cat[0].origins[0].time
     # The time shift is included in the event time for the cmt
     # This should eventually be removed
-    tshift = 0.
+    tshift = cat[0].origins[0].time - cat[0].origins[1].time
     return cmtlat, cmtlon, eventtime, tshift, hdur
 
 
@@ -222,7 +222,7 @@ def procStream(st, inv, eventtime, tshift, freqmin, freqmax, corners, lents, hdu
 # Here is where Kim wonders if Adam is done mucking around.
             if synthetic:
                 tr.data /= (10**9)
-                tr.stats.starttime += float(tshift)/2.
+                tr.stats.starttime += float(tshift)
                 win = signal.hann(int(2*hdur))
                 tr.data = signal.convolve(tr.data,win, mode='same')/sum(win)
       
@@ -368,7 +368,8 @@ if __name__ == "__main__":
             print(cat)        
         
         cmtlat, cmtlon, eventtime, tshift, hdur = readcmt(cat)
-
+        if debug:
+            print(cat[0].origins)
         # Lets make a local results directory
         resultdir = parserval.resDir
         if resultdir[-1] == '/':
@@ -412,7 +413,7 @@ if __name__ == "__main__":
                 except:
                     continue
                 # Lets go through each trace in the stream and deconvolve and filter
-                st = procStream(st, inv, eventtime, tshift, userminfre, usermaxfre, filtercornerpoles, lents, hdur)
+                st = procStream(st, inv, eventtime,0., userminfre, usermaxfre, filtercornerpoles, lents, hdur)
                 # Lets check for reverse polarity and fix
                 
                 try:

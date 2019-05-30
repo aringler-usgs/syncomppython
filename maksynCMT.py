@@ -24,10 +24,10 @@ debug = True
 
 # this is where the program expects to find the mineos input file 
 # containing the CMT event information
-cmtdirpath = '/home/aringler/synthetics/SYNTHETICS'
+cmtdirpath = '/home/aringler/data_stuff/syncomppython/SYNTHETICS'
 # this is where the program expects to find the station information and the
 # mode information.
-codepath = '/home/aringler/synthetics/syncomppython/synInfo'
+codepath = '/home/aringler/data_stuff/syncomppython/synInfo'
 eventlist = glob.glob(cmtdirpath + '/2*/*') + glob.glob(cmtdirpath + '/1*/*')
 currdir = os.getcwd()
 ind=0;
@@ -56,7 +56,7 @@ for event in eventlist:
 # this is the file within the normal modes database
         parafile.write(codepath + '/auxfiles/modefiles/db_list\n')
 # this is the file with the CMT information
-        parafile.write(event + '/currCMTmineos\n')
+        parafile.write(event + '/CMTSOLUTIONmineos\n')
 # this is the minumum and maximum frequencies
         parafile.write('0. 260.\n')
 # this is the number of pts in the greens function.  This must be >= 30K
@@ -80,7 +80,7 @@ for event in eventlist:
             print 'Need to remove Syndat\n'
 # build the input parameter file for cucss2sac - transforms file to sac format
         parafile = open('parameter_file','w')
-        parafile.write(event + '/currCMTmineos\n')
+        parafile.write(event + '/CMTSOLUTIONmineos\n')
         parafile.write('0\n')
         parafile.write('green\n')
         parafile.write('Syndat\n')
@@ -90,7 +90,7 @@ for event in eventlist:
         os.remove(currdir + '/parameter_file')
         shutil.copy2(codepath + '/auxfiles/longNEW.site', currdir + '/Syndat.site')            
         shutil.copy2(codepath + '/auxfiles/longNEW.sitechan', currdir + '/Syndat.sitechan')
-        os.system('bin/creat_origin ' + event + '/currCMTmineos Syndat')
+        os.system('bin/creat_origin ' + event + '/CMTSOLUTIONmineos Syndat')
 
         os.system('bin/cucss2sac Syndat Syns')
 #Time to clean up stuff

@@ -12,7 +12,7 @@ import os
 import sys
 import datetime
 import math
-
+from obspy import read_events
 debug = True
 
 # this is the path where the synthetics will be created.
@@ -31,7 +31,11 @@ os.system('wget -N http://www.ldeo.columbia.edu/~gcmt/projects/CMT/catalog/NEW_Q
 os.chdir(currdir)
 
 #Read in the CMT file
-qcmt = open(codepath + '/croncode/qcmt.ndk','r')
+
+cat = read_events(codepath + '/croncode/qcmt.ndk')
+for eve in cat:
+    
+
 while True:
     line1 = qcmt.readline()
     line2 = qcmt.readline()

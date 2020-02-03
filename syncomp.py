@@ -59,7 +59,7 @@ def choptocommon(st):
     etime = min([tr.stats.endtime for tr in st])
     st.trim(starttime=stime, endtime=etime)
     if debug:
-        print 'starttime: '+str(stime)+' endtime: '+str(etime)
+        print('starttime: '+str(stime)+' endtime: '+str(etime))
     return st
 
 
@@ -113,10 +113,10 @@ def getdata(net, sta, eventtime, lents, debug=False):
             st += read(curfile, starttime=stime, endtime=etime)
         except:
             if debug:
-                print 'Unable to get data ' + curfile
+                print('Unable to get data ' + curfile)
     st.merge(fill_value='latest')
     if debug:
-        print 'We have data'
+        print('We have data')
     return st
 
 
@@ -164,7 +164,7 @@ def writestats(statfile, streamin, comp):
                 str(tr.stats.starttime.minute) + ":" + str(tr.stats.starttime.second) + "\n")
     except:    
         if debug:
-            print 'No residual for' + tr.stats.station + ' ' + 'LH' + comp    
+            print('No residual for' + tr.stats.station + ' ' + 'LH' + comp) 
     return
 
 
@@ -343,9 +343,9 @@ if __name__ == "__main__":
 
         # Read in the CMT solution from the synthetic directory
         if debug:
-            print "We are using local synthetics"
+            print("We are using local synthetics")
         if not os.path.isfile(synfile + '/CMTSOLUTION'):
-            print "No CMT found"
+            print("No CMT found")
             exit(0)
         try:
             cat = read_events(synfile + '/CMTSOLUTION')
@@ -362,7 +362,7 @@ if __name__ == "__main__":
                 cat = read_events('CMTTEMP')
                 os.remove('CMTTEMP')
             except:
-                print "No CMT found"
+                print("No CMT found")
                 exit(0)
         if debug:
             print(cat)        
@@ -386,7 +386,7 @@ if __name__ == "__main__":
 
         if parserval.sta:
             if debug: 
-                print "We are using a manual station list"
+                print("We are using a manual station list")
             stations = parserval.sta.split(",")
         else:
             stations = client.get_stations(network=net, starttime=eventtime, endtime=eventtime)

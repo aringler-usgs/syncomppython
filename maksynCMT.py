@@ -24,24 +24,24 @@ debug = True
 
 # this is where the program expects to find the mineos input file 
 # containing the CMT event information
-cmtdirpath = '/home/aringler/data_stuff/syncomppython/SYNTHETICS'
+cmtdirpath = '/home/aringler/src/fix_syncomp/syncomppython/SYNTHETICS'
 # this is where the program expects to find the station information and the
 # mode information.
-codepath = '/home/aringler/data_stuff/syncomppython/synInfo'
-eventlist = glob.glob(cmtdirpath + '/2*/*') + glob.glob(cmtdirpath + '/1*/*')
+codepath = '/home/aringler/src/fix_syncomp/syncomppython/synInfo'
+eventlist = glob.glob(cmtdirpath + '/*/*')
 currdir = os.getcwd()
 ind=0;
 if debug:
-    print eventlist
-    print 'The current directory is:' + currdir
+    print(eventlist)
+    print('The current directory is:' + currdir)
 for event in eventlist:
     ind += 1
-    print 'On event ' + str(ind) + ' of ' + str(len(eventlist)) 
+    print('On event ' + str(ind) + ' of ' + str(len(eventlist)))
     if debug:
-        print event
+        print(event)
     if len(os.listdir(event)) == 2:
         if debug:
-            print 'No synthetics for this event'
+            print('No synthetics for this event')
 # Set up the input file to run the mineos greens function.        
 # the output from the greens function is a *.wf_disc file used in 
 # syndat
@@ -49,7 +49,7 @@ for event in eventlist:
 # and eigcon.  
         parafile = open('parameter_file','w')
         if debug:
-            print 'writing parameters'
+            print('writing parameters')
 # this is the path to the database files (directory containing .site and
 # .sitechan files)
         parafile.write(codepath + '/auxfiles/longNEW\n')
@@ -77,7 +77,7 @@ for event in eventlist:
         
 # Check to see if we need to clean up the Syndat
         if os.path.exists(currdir + 'Syndat.wfdisc'):
-            print 'Need to remove Syndat\n'
+            print('Need to remove Syndat\n')
 # build the input parameter file for cucss2sac - transforms file to sac format
         parafile = open('parameter_file','w')
         parafile.write(event + '/CMTSOLUTIONmineos\n')
@@ -111,22 +111,22 @@ for event in eventlist:
 # add a different ending
             syncurchan = syncurchan[5] + '.XX.' + syncurchan[6] + '.modes.sac'
             if debug:
-                print 'Old synthetic:' + syncur
-                print 'New synthetic:' + syncurchan
-                print 'Move to location:' + event + '/' + syncurchan
+                print('Old synthetic:' + syncur)
+                print('New synthetic:' + syncurchan)
+                print('Move to location:' + event + '/' + syncurchan)
 #  move things around 
             os.system('cp ' + syncur + ' ' + event + '/' + syncurchan)
 # do some clean up
-        sys.exit()        
+        #sys.exit()        
         os.system('rm -r ' + currdir + '/Syns')
 # add some info into the synthetic file headers using a perl script. if
 # you are curious about these options take a look at the script.
         synprostr = '-S -m ' + event + '/CMTSOLUTION '
         synprostr = synprostr + '-s 1.0 -l 0/4000 -t 40/400 -x proc ' 
         synprostr = synprostr + event + '/*modes.sac '    
-        print synprostr
+        print(synprostr)
 ## make sure the process_syn.pl is in your path
-        os.system('bin/process_syn.pl ' + synprostr )
-        os.system('rm -r ' + event + '/*modes.sac')
+        #os.system('bin/process_syn.pl ' + synprostr )
+        #os.system('rm -r ' + event + '/*modes.sac')
         os.system('chmod -R 755 ' + event)
-        sys.exit()
+        #sys.exit()

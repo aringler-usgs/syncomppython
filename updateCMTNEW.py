@@ -87,11 +87,11 @@ def cmt_to_mineos(filename, debug = True):
 
 
 # this is the path where the synthetics will be created.
-cmtdirpath = '/home/aringler/data_stuff/syncomppython/SYNTHETICS'
+cmtdirpath = '/home/aringler/src/fix_syncomp/syncomppython/SYNTHETICS'
 # this is the path where it will output information about all of the data it is 
 # getting. at the moment it is set to a directory in the user's home
-codepath = '/home/aringler/data_stuff/syncomppython/synInfo'
-minmag= 6.5
+codepath = '/home/aringler/src/fix_syncomp/syncomppython/synInfo'
+minmag= 7.0
 
 #Download the latest CMT files
 currdir = os.getcwd()

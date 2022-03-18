@@ -368,7 +368,7 @@ if __name__ == "__main__":
             print(cat)        
         
         cmtlat, cmtlon, eventtime, tshift, hdur = readcmt(cat)
-        if eventtime.year <= 21:
+        if eventtime.year <= 22:
             eventtime.year += 2000
         elif eventtime.year <= 70:
             eventtime.year += 1900
